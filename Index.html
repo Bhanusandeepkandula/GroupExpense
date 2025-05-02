@@ -1,0 +1,143 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Group Expense Tracker</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background: #f4f4f4;
+            margin: 0;
+            padding: 20px;
+        }
+        .container {
+            max-width: 800px;
+            margin: auto;
+            background: #fff;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+        }
+        h1, h2 {
+            text-align: center;
+        }
+        input, select, button {
+            padding: 10px;
+            margin: 5px 0;
+            width: 100%;
+            box-sizing: border-box;
+        }
+        .expenses, .summary {
+            margin-top: 20px;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 10px;
+        }
+        th, td {
+            padding: 12px;
+            border: 1px solid #ddd;
+            text-align: center;
+        }
+        .summary {
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Group Expense Tracker</h1>
+        <div>
+            <label for="payer">Who Paid?</label>
+            <select id="payer">
+                <option value="Alice">Alice</option>
+                <option value="Bob">Bob</option>
+                <option value="Charlie">Charlie</option>
+                <option value="Dave">Dave</option>
+            </select>
+            <label for="amount">Amount</label>
+            <input type="number" id="amount" placeholder="Enter amount">
+            <label for="description">Description</label>
+            <input type="text" id="description" placeholder="Enter description">
+            <button onclick="addExpense()">Add Expense</button>
+        </div>
+        <div class="expenses">
+            <h2>Expenses</h2>
+            <table id="expenseTable">
+                <thead>
+                    <tr>
+                        <th>Payer</th>
+                        <th>Amount</th>
+                        <th>Description</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <!-- Expenses will be listed here -->
+                </tbody>
+            </table>
+        </div>
+        <div class="summary">
+            <h2>Balance Summary</h2>
+            <div id="summaryTable"></div>
+        </div>
+    </div>
+
+    <script>
+        const expenses = [];
+        const members = ["Alice", "Bob", "Charlie", "Dave"];
+
+        function addExpense() {
+            const payer = document.getElementById("payer").value;
+            const amount = parseFloat(document.getElementById("amount").value);
+            const description = document.getElementById("description").value;
+
+            if (!amount || !description) {
+                alert("Please fill all fields.");
+                return;
+            }
+
+            expenses.push({ payer, amount, description });
+            renderExpenses();
+            renderSummary();
+            document.getElementById("amount").value = "";
+            document.getElementById("description").value = "";
+        }
+
+        function renderExpenses() {
+            const tbody = document.querySelector("#expenseTable tbody");
+            tbody.innerHTML = "";
+            expenses.forEach(exp => {
+                const row = `<tr><td>${exp.payer}</td><td>$${exp.amount.toFixed(2)}</td><td>${exp.description}</td></tr>`;
+                tbody.innerHTML += row;
+            });
+        }
+
+        function renderSummary() {
+            const summaryDiv = document.getElementById("summaryTable");
+            summaryDiv.innerHTML = "";
+
+            const total = expenses.reduce((sum, exp) => sum + exp.amount, 0);
+            const share = total / members.length;
+            const balance = {};
+
+            members.forEach(member => balance[member] = -share);
+
+            expenses.forEach(exp => {
+                balance[exp.payer] += exp.amount;
+            });
+
+            let summaryHTML = "<table><tr><th>Member</th><th>Balance</th></tr>";
+            members.forEach(member => {
+                let status = balance[member] < 0 ? "owes" : "is owed";
+                summaryHTML += `<tr><td>${member}</td><td>${status} $${Math.abs(balance[member]).toFixed(2)}</td></tr>`;
+            });
+            summaryHTML += "</table>";
+
+            summaryDiv.innerHTML = summaryHTML;
+        }
+    </script>
+</body>
+</html>
