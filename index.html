@@ -3,57 +3,83 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>💸 Group Expense Tracker</title>
+  <title>Group Expense Tracker</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
-  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;700&display=swap" rel="stylesheet">
-  
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
   <!-- Firebase SDK -->
   <script src="https://www.gstatic.com/firebasejs/9.6.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.6.0/firebase-database-compat.js"></script>
-  
   <style>
-    body { font-family: 'Manrope', sans-serif; }
+    body { 
+      font-family: 'Inter', sans-serif;
+      background-color: #f8fafc;
+    }
+    .card {
+      background: white;
+      border-radius: 12px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+      transition: all 0.2s ease;
+    }
+    .card:hover {
+      box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+    }
+    .form-input {
+      border-radius: 8px;
+      border: 1px solid #e2e8f0;
+      transition: all 0.2s ease;
+    }
+    .form-input:focus {
+      border-color: #3b82f6;
+      box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+    }
+    .btn-primary {
+      background-color: #3b82f6;
+      transition: all 0.2s ease;
+    }
+    .btn-primary:hover {
+      background-color: #2563eb;
+    }
     .chip {
-      background-color: #f0f0f0;
-      color: #333;
-      padding: 4px 10px;
-      border-radius: 9999px;
-      display: inline-block;
-      margin: 2px;
+      background-color: #f1f5f9;
+      color: #1e293b;
+      padding: 6px 12px;
+      border-radius: 20px;
+      display: inline-flex;
+      align-items: center;
       font-size: 0.875rem;
     }
-    @media (max-width: 640px) {
-      .responsive-table th, .responsive-table td {
-        padding: 4px 2px;
-        font-size: 0.875rem;
-      }
-    }
-    .table-row {
-      transition: all 0.2s;
-    }
-    .table-row:hover {
-      background-color: #f8f8f8;
-    }
-    .user-balance {
-      transition: all 0.3s;
-    }
-    .user-balance:hover {
-      transform: scale(1.05);
-    }
     .tab {
-      cursor: pointer;
-      padding: 8px 16px;
-      border-radius: 8px 8px 0 0;
+      border-bottom: 3px solid transparent;
+      transition: all 0.2s ease;
+      font-weight: 500;
     }
     .tab.active {
-      background-color: #f3f4f6;
-      font-weight: bold;
-      border-bottom: 2px solid #3b82f6;
+      border-color: #3b82f6;
+      color: #3b82f6;
+    }
+    .modal-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.4);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      z-index: 50;
+    }
+    .modal {
+      background: white;
+      padding: 2rem;
+      border-radius: 16px;
+      width: 90%;
+      max-width: 600px;
+      max-height: 90vh;
+      overflow-y: auto;
+      box-shadow: 0 10px 25px -5px rgba(0,0,0,0.1);
     }
   </style>
   <script>
-    // Firebase configuration
+    // Firebase config & init
     const firebaseConfig = {
       apiKey: "AIzaSyB-domZ-auX6gjlVd8PUtQNejIbnI6s4pU",
       authDomain: "babai-bd396.firebaseapp.com",
@@ -64,567 +90,832 @@
       appId: "1:35426041175:web:062b896e01dcb17c325212",
       measurementId: "G-ZCHCMW26LF"
     };
-
-    // Initialize Firebase
-    const app = firebase.initializeApp(firebaseConfig);
+    firebase.initializeApp(firebaseConfig);
     const database = firebase.database();
 
-    const users = { "6301": "Babai", "2806": "Harsha", "6969": "Nihal", "0400": "Kiwi" };
-    const userList = ["Babai", "Harsha", "Nihal", "Kiwi"];
-    let expenses = [];
-    let editIndex = -1;
-    let currentUser = null;
-    let currentView = "all"; // "all", "weekly", "monthly", "user"
+    const users = { "6301":"Babai","2806":"Harsha","6969":"Nihal","0400":"Kiwi" };
+    const userList = ["Babai","Harsha","Nihal","Kiwi"];
+    let expenses = [], editIndex = -1, currentUser = null, currentView = "all", myRecordsOnly = false;
 
-    // Initialize the app
-    function initApp() {
+    function initApp(){
       loadExpenses();
       updateSessionByTime();
       document.getElementById('date').valueAsDate = new Date();
     }
-
-    // Login functionality
-    function validateLogin() {
+    function validateLogin(){
       const code = document.getElementById("loginCode").value;
-      if (users[code]) {
-        currentUser = users[code];
-        localStorage.setItem("userLoggedIn", currentUser);
-        showMainApp(currentUser);
-      } else {
-        showAlert("❌ Wrong 4-digit code. Please try again.");
+      if(users[code]){ 
+        currentUser=users[code]; 
+        localStorage.setItem("userLoggedIn",currentUser); 
+        showMainApp(currentUser); 
       }
+      else showAlert("Invalid login code", 'error');
     }
-
-    function showMainApp(userName) {
+    function showMainApp(name){
       document.getElementById("loginContainer").classList.add("hidden");
       document.getElementById("appContent").classList.remove("hidden");
-      document.getElementById("recordedBy").value = userName;
-      document.getElementById("heading").innerText = `👥 ${userName}'s Group Expense Tracker`;
-      showAlert(`✅ Welcome, ${userName}!`);
+      document.getElementById("recordedBy").value = name;
+      document.getElementById("heading").innerText = `${name}'s Expense Tracker`;
+      showAlert(`Welcome back, ${name}!`, 'success');
       initApp();
     }
-
-    function logout() {
-      localStorage.removeItem("userLoggedIn");
-      currentUser = null;
-      location.reload();
-    }
-
-    // Alert system
-    function showAlert(message, type = 'error') {
-      const alertBox = document.getElementById("alertBox");
-      alertBox.textContent = message;
-      alertBox.className = `fixed top-5 right-5 px-4 py-2 rounded shadow transition-opacity ${type === 'error' ? 'bg-red-500' : 'bg-green-500'} text-white opacity-100`;
-      setTimeout(() => alertBox.classList.add("opacity-0"), 3000);
-    }
-
-    // Time-based session detection
-    function updateSessionByTime() {
-      const hour = new Date().getHours();
-      const session = document.getElementById("session");
-      if (hour < 12) session.value = "Morning";
-      else if (hour < 17) session.value = "Afternoon";
-      else session.value = "Evening";
-    }
-
-    // People selection chips
-    function updateSelectedChips() {
-      const chipsContainer = document.getElementById("selectedChips");
-      chipsContainer.innerHTML = '';
-      const checkboxes = document.querySelectorAll('.personCheck:checked');
+    function logout(){ localStorage.removeItem("userLoggedIn"); location.reload(); }
+    function showAlert(msg, type='error'){
+      const b = document.getElementById("alertBox");
+      b.textContent = msg;
+      b.className = `fixed top-5 right-5 px-4 py-3 rounded-lg shadow transition-all duration-300 ${
+        type==='error'?'bg-red-600':'bg-green-600'
+      } text-white opacity-100 flex items-center`;
       
-      checkboxes.forEach(checkbox => {
-        const chip = document.createElement('span');
-        chip.className = 'chip';
-        chip.textContent = checkbox.value;
-        chipsContainer.appendChild(chip);
+      const icon = document.createElement('i');
+      icon.className = type === 'error' ? 'fas fa-exclamation-circle mr-2' : 'fas fa-check-circle mr-2';
+      b.prepend(icon);
+      
+      setTimeout(()=>b.classList.add("opacity-0"),3000);
+    }
+    function updateSessionByTime(){
+      const h=new Date().getHours(), s=document.getElementById("session");
+      s.value = h<12?"Morning":h<17?"Afternoon":"Evening";
+    }
+    function updateSelectedChips(){
+      const c=document.getElementById("selectedChips");
+      c.innerHTML='';
+      document.querySelectorAll('.personCheck:checked').forEach(cb=>{
+        const chip=document.createElement('span');
+        chip.className='chip flex items-center mr-2 mb-2'; 
+        chip.innerHTML = `<i class="fas fa-user mr-2 text-xs opacity-70"></i>${cb.value}`;
+        c.appendChild(chip);
       });
-      
-      // Update each pays amount when people selection changes
       updateEachPays();
     }
-
-    function toggleAllCheckboxes(source) {
-      const checkboxes = document.querySelectorAll('.personCheck');
-      checkboxes.forEach(checkbox => {
-        checkbox.checked = source.checked;
-      });
+    function toggleAllCheckboxes(src){
+      document.querySelectorAll('.personCheck').forEach(cb=>cb.checked=src.checked);
       updateSelectedChips();
     }
-    
-   function updateEachPays() {
-  const amount = parseFloat(document.getElementById('amount').value);
-  const type = document.getElementById('type').value;
-  const checkboxes = document.querySelectorAll('.personCheck:checked');
-  const splitInfo = document.getElementById('splitInfo');
-
-  if (isNaN(amount)) {
-    document.getElementById('eachPaysDisplay').textContent = "0.00";
-    splitInfo.textContent = "";
-    return;
-  }
-
-  if (type === 'Credit') {
-    document.getElementById('eachPaysDisplay').textContent = amount.toFixed(2);
-    splitInfo.textContent = "(Full amount received)";
-  } else {
-    if (checkboxes.length === 0) {
-      document.getElementById('eachPaysDisplay').textContent = "0.00";
-      splitInfo.textContent = "(No one selected)";
-      return;
+    function updateEachPays(){
+      const amt=parseFloat(document.getElementById('amount').value), 
+            sel=document.querySelectorAll('.personCheck:checked'), 
+            info=document.getElementById('splitInfo'), 
+            disp=document.getElementById('eachPaysDisplay');
+      if(isNaN(amt)||!sel.length){ 
+        disp.textContent="0.00"; 
+        info.textContent=sel.length?"":"Select at least one person"; 
+        return; 
+      }
+      const each=amt/sel.length;
+      disp.textContent=each.toFixed(2);
+      info.textContent=`Split among ${sel.length} ${sel.length===1?"person":"people"}`;
     }
-    const eachPays = amount / checkboxes.length;
-    document.getElementById('eachPaysDisplay').textContent = eachPays.toFixed(2);
-    splitInfo.textContent = `(Split among ${checkboxes.length} ${checkboxes.length === 1 ? "person" : "people"})`;
-  }
-}
-
-
-
-    // Expense CRUD operations with Firebase
-    function loadExpenses() {
-      const expensesRef = database.ref('expenses');
-      expensesRef.orderByChild('timestamp').on('value', (snapshot) => {
-        const data = snapshot.val();
-        if (data) {
-          // Convert object to array and sort by timestamp (newest first)
-          expenses = Object.entries(data).map(([key, value]) => ({ id: key, ...value }));
-          expenses.sort((a, b) => b.timestamp - a.timestamp);
-        } else {
-          expenses = [];
-        }
-        renderExpenses();
-        updateTotals();
-        updateUserBalances();
+    function loadExpenses(){
+      database.ref('expenses').orderByChild('timestamp').on('value',snap=>{
+        const d=snap.val();
+        expenses = d?Object.entries(d).map(([id,v])=>({id,...v})):[]; 
+        expenses.sort((a,b)=>b.timestamp-a.timestamp);
+        renderExpenses(); updateTotals(); updateUserBalances();
       });
     }
-
-    function addEntry(e) {
+    function addEntry(e){
       e.preventDefault();
+      const date=document.getElementById('date').value, 
+            session=document.getElementById('session').value,
+            type=document.getElementById('type').value, 
+            amount=parseFloat(document.getElementById('amount').value),
+            category=document.getElementById('category').value, 
+            notes=document.getElementById('notes').value,
+            recordedBy=document.getElementById('recordedBy').value;
+      const people=[]; 
+      document.querySelectorAll('.personCheck:checked').forEach(cb=>people.push(cb.value));
       
-      const date = document.getElementById('date').value;
-      const session = document.getElementById('session').value;
-      const type = document.getElementById('type').value;
-      const amount = parseFloat(document.getElementById('amount').value);
-      const category = document.getElementById('category').value;
-      const notes = document.getElementById('notes').value;
-      const recordedBy = document.getElementById('recordedBy').value;
-      
-      const people = [];
-      document.querySelectorAll('.personCheck:checked').forEach(checkbox => {
-        people.push(checkbox.value);
-      });
-      
-      if (!date || !amount || isNaN(amount) || people.length === 0) {
-        showAlert("❌ Please fill all required fields (Date, Amount, and select at least one person)");
-        return;
+      if(!date||isNaN(amount)||!people.length){ 
+        showAlert("Please complete all required fields", 'error'); 
+        return; 
       }
       
-      const eachPays = type === 'Credit' ? amount : (amount / people.length);
-      
-      const entry = {
-        date,
-        session,
-        type,
-        amount,
-        category,
-        notes,
-        recordedBy,
-        people,
-        eachPays,
+      const eachPays=amount/people.length;
+      const entry={
+        date, session, type, amount, category, 
+        notes, recordedBy, people, eachPays,
         timestamp: firebase.database.ServerValue.TIMESTAMP
       };
       
-      const expensesRef = database.ref('expenses');
-      
-      if (editIndex >= 0) {
-        // Update existing expense
-        const expenseId = expenses[editIndex].id;
-        database.ref(`expenses/${expenseId}`).update(entry)
-          .then(() => {
-            editIndex = -1;
-            document.querySelector('button[onclick="addEntry(event)"]').textContent = '+ Add Entry';
-            showAlert("✅ Expense updated successfully!", 'success');
-            resetForm();
-          })
-          .catch((error) => {
-            showAlert("❌ Error updating expense: " + error.message);
-          });
+      const ref=database.ref('expenses');
+      if(editIndex>=0){
+        const id=expenses[editIndex].id;
+        database.ref(`expenses/${id}`).update(entry).then(()=>{
+          editIndex=-1; 
+          document.getElementById('submitBtn').innerHTML='<i class="fas fa-plus mr-2"></i> Add Expense';
+          showAlert("Expense updated successfully", 'success'); 
+          resetForm();
+        }).catch(err=>showAlert("Update failed: " + err.message, 'error'));
       } else {
-        // Add new expense
-        expensesRef.push(entry)
-          .then(() => {
-            showAlert("✅ Expense added successfully!", 'success');
-            resetForm();
-          })
-          .catch((error) => {
-            showAlert("❌ Error adding expense: " + error.message);
-          });
+        ref.push(entry).then(()=>{ 
+          showAlert("Expense added successfully", 'success'); 
+          resetForm(); 
+        }).catch(err=>showAlert("Add failed: " + err.message, 'error'));
       }
     }
-
-    function editEntry(index) {
-      const entry = expenses[index];
-      document.getElementById('date').value = entry.date;
-      document.getElementById('session').value = entry.session;
-      document.getElementById('type').value = entry.type;
-      document.getElementById('amount').value = entry.amount;
-      document.getElementById('category').value = entry.category;
-      document.getElementById('notes').value = entry.notes;
-      document.getElementById('recordedBy').value = entry.recordedBy;
-      
-      // Clear all checkboxes first
-      document.querySelectorAll('.personCheck').forEach(checkbox => {
-        checkbox.checked = false;
-      });
-      
-      // Check the boxes for people in this entry
-      entry.people.forEach(person => {
-        document.querySelector(`.personCheck[value="${person}"]`).checked = true;
-      });
-      
-      updateSelectedChips();
-      editIndex = index;
-      document.querySelector('button[onclick="addEntry(event)"]').textContent = 'Update Entry';
-      document.getElementById('eachPaysDisplay').textContent = entry.eachPays.toFixed(2);
-      window.scrollTo({ top: 0, behavior: 'smooth' });
-    }
-
-    function deleteEntry(index) {
-      if (confirm('Are you sure you want to delete this expense?')) {
-        const expenseId = expenses[index].id;
-        database.ref(`expenses/${expenseId}`).remove()
-          .then(() => {
-            showAlert("🗑️ Expense deleted successfully!", 'success');
-          })
-          .catch((error) => {
-            showAlert("❌ Error deleting expense: " + error.message);
-          });
-      }
-    }
-
-    function resetForm() {
+    function resetForm(){
       document.querySelector('form').reset();
-      document.getElementById('selectedChips').innerHTML = '';
-      document.getElementById('date').valueAsDate = new Date();
-      document.getElementById('eachPaysDisplay').textContent = '0.00';
+      document.getElementById('selectedChips').innerHTML='';
+      document.getElementById('date').valueAsDate=new Date();
+      document.getElementById('eachPaysDisplay').textContent='0.00';
+      document.getElementById('splitInfo').textContent='Select at least one person';
       updateSessionByTime();
-      editIndex = -1;
-      document.querySelector('button[onclick="addEntry(event)"]').textContent = '+ Add Entry';
+      editIndex=-1; 
+      document.getElementById('submitBtn').innerHTML='<i class="fas fa-plus mr-2"></i> Add Expense';
     }
-
-    function renderExpenses() {
-      const tbody = document.getElementById('tableBody');
-      tbody.innerHTML = '';
-      
-      let filteredExpenses = expenses;
-      
-      // Apply filters based on current view
-      const now = new Date();
-      switch(currentView) {
-        case "weekly":
-          const oneWeekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-          filteredExpenses = expenses.filter(exp => new Date(exp.date) >= oneWeekAgo);
-          break;
-        case "monthly":
-          const oneMonthAgo = new Date(now.getFullYear(), now.getMonth() - 1, now.getDate());
-          filteredExpenses = expenses.filter(exp => new Date(exp.date) >= oneMonthAgo);
-          break;
-        case "user":
-          filteredExpenses = expenses.filter(exp => exp.people.includes(currentUser) || exp.recordedBy === currentUser);
-          break;
+    function editEntry(idx){
+      const e=expenses[idx];
+      ['date','session','type','amount','category','notes','recordedBy'].forEach(id=>document.getElementById(id).value=e[id]);
+      document.querySelectorAll('.personCheck').forEach(cb=>cb.checked=false);
+      e.people.forEach(p=>document.querySelector(`.personCheck[value="${p}"]`).checked=true);
+      updateSelectedChips();
+      editIndex=idx; 
+      document.getElementById('submitBtn').innerHTML='<i class="fas fa-save mr-2"></i> Update Expense';
+      window.scrollTo({top:0,behavior:'smooth'});
+    }
+    function deleteEntry(idx){
+      if(confirm('Are you sure you want to delete this expense?')){
+        const id=expenses[idx].id;
+        database.ref(`expenses/${id}`).remove()
+          .then(()=>showAlert("Expense deleted", 'success'))
+          .catch(err=>showAlert("Delete failed: " + err.message, 'error'));
       }
-      
-      if (filteredExpenses.length === 0) {
-        const row = document.createElement('tr');
-        row.innerHTML = `<td colspan="10" class="py-4 text-center text-gray-500">No expenses found</td>`;
-        tbody.appendChild(row);
-        return;
-      }
-      
-      filteredExpenses.forEach((expense, index) => {
-        const row = document.createElement('tr');
-        row.className = 'table-row border-b';
-        
-        // Format people list with icons
-        const peopleList = expense.people.map(p => 
-          `<span class="inline-flex items-center bg-gray-100 px-2 py-1 rounded-full text-xs mr-1">
-            ${p}
-          </span>`
-        ).join('');
-        
-        row.innerHTML = `
-          <td class="py-3 px-2 whitespace-nowrap">${formatDateShort(expense.date)}</td>
-          <td class="px-2">${expense.session.charAt(0)}</td>
-          <td class="px-2 ${expense.type === 'Credit' ? 'text-green-500' : 'text-red-500'}">${expense.type.charAt(0)}</td>
-          <td class="px-2 font-medium">$${expense.amount.toFixed(2)}</td>
-          <td class="px-2">${expense.category || '-'}</td>
-          <td class="px-2 truncate max-w-xs">${expense.notes || '-'}</td>
-          <td class="px-2">${peopleList}</td>
-          <td class="px-2">$${expense.eachPays.toFixed(2)}</td>
-          <td class="px-2">${expense.recordedBy}</td>
-          <td class="px-2 whitespace-nowrap">
-            <button onclick="editEntry(${expenses.findIndex(e => e.id === expense.id)})" class="text-blue-500 hover:text-blue-700 mr-2">
-              <i class="fas fa-edit"></i>
-            </button>
-            <button onclick="deleteEntry(${expenses.findIndex(e => e.id === expense.id)})" class="text-red-500 hover:text-red-700">
-              <i class="fas fa-trash"></i>
-            </button>
-          </td>
-        `;
-        tbody.appendChild(row);
-      });
     }
-
-    function formatDateShort(dateString) {
-      const date = new Date(dateString);
-      return `${date.getDate()}/${date.getMonth()+1}`;
-    }
-
-    function updateTotals() {
-      let totalIncome = 0;
-      let totalExpense = 0;
-      
-      expenses.forEach(expense => {
-        if (expense.type === 'Credit') {
-          totalIncome += expense.amount;
-        } else {
-          totalExpense += expense.amount;
-        }
-      });
-      
-      document.getElementById('totalIncome').textContent = totalIncome.toFixed(2);
-      document.getElementById('totalExpense').textContent = totalExpense.toFixed(2);
-      document.getElementById('netBalance').textContent = (totalIncome - totalExpense).toFixed(2);
-    }
-    
-    function updateUserBalances() {
-      const balances = {};
-      userList.forEach(user => {
-        balances[user] = 0;
-      });
-      
-      expenses.forEach(expense => {
-        if (expense.type === 'Credit') {
-          // Credit is added to the recordedBy user
-          balances[expense.recordedBy] += expense.amount;
-        } else {
-          // Debit is split among selected people
-          const eachPays = expense.amount / expense.people.length;
-          expense.people.forEach(person => {
-            balances[person] -= eachPays;
-          });
-          // Recorded by person gets the full amount (they paid it)
-          balances[expense.recordedBy] += expense.amount;
-        }
-      });
-      
-      // Update the UI
-      const container = document.getElementById('userBalances');
-      container.innerHTML = '';
-      
-      userList.forEach(user => {
-        const balance = balances[user];
-        const balanceElement = document.createElement('div');
-        balanceElement.className = `user-balance bg-white rounded p-4 font-bold shadow border text-center ${
-          balance > 0 ? 'text-green-600' : balance < 0 ? 'text-red-500' : 'text-gray-600'
-        }`;
-        balanceElement.innerHTML = `
-          <div class="text-sm">${user}</div>
-          <div class="text-xl">$${balance.toFixed(2)}</div>
-          ${balance > 0 ? '<div class="text-xs mt-1">Gets back</div>' : 
-           balance < 0 ? '<div class="text-xs mt-1">Owes</div>' : ''}
-        `;
-        container.appendChild(balanceElement);
-      });
-    }
-    
-    function changeView(view) {
-      currentView = view;
-      document.querySelectorAll('.view-tab').forEach(tab => {
-        tab.classList.remove('active');
-      });
+    function changeView(view){
+      currentView=view;
+      document.querySelectorAll('.view-tab').forEach(t=>t.classList.remove('active'));
       document.getElementById(`view-${view}`).classList.add('active');
       renderExpenses();
     }
-
-    // Initialize on DOM load
-    document.addEventListener("DOMContentLoaded", () => {
-      // Check if user is already logged in
-      const storedUser = localStorage.getItem("userLoggedIn");
-      if (storedUser) {
-        showMainApp(storedUser);
+    function toggleMyRecords(){ 
+      myRecordsOnly=document.getElementById('myRecordsToggle').checked; 
+      renderExpenses(); 
+    }
+    function renderExpenses(){
+      const tbody=document.getElementById('tableBody'); 
+      tbody.innerHTML='';
+      let filtered=[...expenses];
+      
+      // date range
+      const sd=document.getElementById('startDate').value, ed=document.getElementById('endDate').value;
+      if(sd&&ed){
+        const s=new Date(sd), e=new Date(ed);
+        filtered=filtered.filter(x=>{const d=new Date(x.date); return d>=s&&d<=e;});
+      } else {
+        if(currentView==='weekly'){ 
+          const oneWeek=new Date(Date.now()-7*24*3600*1000); 
+          filtered=filtered.filter(x=>new Date(x.date)>=oneWeek); 
+        }
+        if(currentView==='monthly'){ 
+          const om=new Date((new Date()).setMonth((new Date()).getMonth()-1)); 
+          filtered=filtered.filter(x=>new Date(x.date)>=om); 
+        }
+        if(currentView==='user') filtered=filtered.filter(x=>x.recordedBy===currentUser||x.people.includes(currentUser));
       }
       
-      // Add event listeners for dynamic updates
-      document.getElementById('amount').addEventListener('input', updateEachPays);
-      document.getElementById('type').addEventListener('change', updateEachPays);
+      if(myRecordsOnly) filtered=filtered.filter(x=>x.recordedBy===currentUser||x.people.includes(currentUser));
+      
+      if(!filtered.length){
+        tbody.innerHTML=`
+          <tr>
+            <td colspan="10" class="py-8 text-center text-gray-500">
+              <i class="fas fa-inbox text-3xl mb-3 opacity-30"></i>
+              <div class="text-lg">No expenses found</div>
+            </td>
+          </tr>`;
+        return;
+      }
+      
+      filtered.forEach(exp=>{
+        const tr=document.createElement('tr'); 
+        tr.className='border-b hover:bg-gray-50 transition-colors';
+        
+        const peopleList=exp.people.map(p=>`
+          <span class="inline-flex items-center bg-gray-100 px-3 py-1 rounded-full text-xs mr-1 mb-1">
+            <i class="fas fa-user mr-1 text-xs opacity-70"></i>${p}
+          </span>`).join('');
+        
+        tr.innerHTML=`
+          <td class="py-4 px-4 whitespace-nowrap text-sm text-gray-800">${formatDateShort(exp.date)}</td>
+          <td class="px-4 text-sm text-gray-600">${exp.session.charAt(0)}</td>
+          <td class="px-4 ${exp.type==='Credit'?'text-green-600':'text-red-600'} text-sm">
+            <i class="fas ${exp.type==='Credit'?'fa-arrow-up':'fa-arrow-down'}"></i>
+          </td>
+          <td class="px-4 font-medium text-sm">$${exp.amount.toFixed(2)}</td>
+          <td class="px-4 text-sm">
+            <span class="inline-flex items-center">
+              ${getCategoryIcon(exp.category)} ${exp.category||'Uncategorized'}
+            </span>
+          </td>
+          <td class="px-4 text-sm text-gray-600 truncate max-w-xs">${exp.notes||'-'}</td>
+          <td class="px-4 text-sm">
+            <div class="flex flex-wrap">${peopleList}</div>
+          </td>
+          <td class="px-4 text-sm font-medium">$${exp.eachPays.toFixed(2)}</td>
+          <td class="px-4 text-sm">
+            <span class="inline-flex items-center">
+              <i class="fas fa-user-edit mr-1 text-xs opacity-70"></i>${exp.recordedBy}
+            </span>
+          </td>
+          <td class="px-4 whitespace-nowrap text-sm">
+            <button onclick="editEntry(${expenses.findIndex(e=>e.id===exp.id)})" 
+                    class="text-blue-600 hover:text-blue-800 mr-2 p-2 rounded-lg hover:bg-blue-50 transition-colors">
+              <i class="fas fa-edit"></i>
+            </button>
+            <button onclick="deleteEntry(${expenses.findIndex(e=>e.id===exp.id)})" 
+                    class="text-red-600 hover:text-red-800 p-2 rounded-lg hover:bg-red-50 transition-colors">
+              <i class="fas fa-trash"></i>
+            </button>
+          </td>`;
+        tbody.appendChild(tr);
+      });
+    }
+    
+    function getCategoryIcon(category) {
+      if (!category) return '<i class="fas fa-tag mr-2 text-gray-400"></i>';
+      const icons = {
+        'Food': 'fa-utensils text-orange-500',
+        'Rent': 'fa-home text-blue-500',
+        'Transport': 'fa-bus text-green-500',
+        'Shopping': 'fa-shopping-bag text-purple-500',
+        'Entertainment': 'fa-film text-pink-500',
+        'Utilities': 'fa-bolt text-yellow-500',
+        'Travel': 'fa-plane text-indigo-500',
+        'Health': 'fa-heartbeat text-red-500'
+      };
+      const defaultIcon = 'fa-tag text-gray-400';
+      const iconClass = icons[category] || defaultIcon;
+      return `<i class="fas ${iconClass} mr-2"></i>`;
+    }
+    
+    function formatDateShort(d){ 
+      const dt=new Date(d); 
+      return `${dt.getDate()}/${dt.getMonth()+1}`; 
+    }
+    
+    function updateTotals(){
+      let inc=0, expT=0; 
+      expenses.forEach(e=>e.type==='Credit'?inc+=e.amount:expT+=e.amount);
+      document.getElementById('totalIncome').textContent=inc.toFixed(2);
+      document.getElementById('totalExpense').textContent=expT.toFixed(2);
+      document.getElementById('netBalance').textContent=(inc-expT).toFixed(2);
+    }
+    
+    function updateUserBalances(){
+      const bal={}; userList.forEach(u=>bal[u]=0);
+      expenses.forEach(e=>{
+        if(e.type==='Credit') bal[e.recordedBy]+=e.amount;
+        else{ 
+          const each=e.amount/e.people.length; 
+          e.people.forEach(p=>bal[p]-=each); 
+          bal[e.recordedBy]+=e.amount; 
+        }
+      });
+      
+      const c=document.getElementById('userBalances'); 
+      c.innerHTML='';
+      
+      userList.forEach(u=>{
+        const b=bal[u], div=document.createElement('div');
+        div.className=`card p-5 text-center ${
+          b>0?'border-green-200 bg-green-50 text-green-700':
+          b<0?'border-red-200 bg-red-50 text-red-700':
+          'border-gray-200 bg-gray-50 text-gray-700'
+        } border`;
+        
+        div.innerHTML=`
+          <div class="text-sm mb-2 flex items-center justify-center">
+            <i class="fas fa-user-circle mr-2 ${b>0?'text-green-600':b<0?'text-red-600':'text-gray-500'}"></i>${u}
+          </div>
+          <div class="text-2xl font-bold mb-2">$${Math.abs(b).toFixed(2)}</div>
+          <div class="text-xs ${
+            b>0?'text-green-600':b<0?'text-red-600':'text-gray-500'
+          }">
+            <i class="fas ${
+              b>0?'fa-arrow-up':b<0?'fa-arrow-down':'fa-check'
+            } mr-1"></i>
+            ${b>0?'Gets back':b<0?'Owes':'Settled'}
+          </div>`;
+        c.appendChild(div);
+      });
+    }
+    
+    function exportCSV(){
+      const header=["Date","Session","Type","Amount","Category","Notes","People","EachPays","RecordedBy"];
+      const rows=expenses.map(e=>[
+        e.date,e.session,e.type,
+        e.amount.toFixed(2),e.category,
+        `"${e.notes||''}"`,
+        `"${e.people.join(',')}"`,
+        e.eachPays.toFixed(2),e.recordedBy
+      ]);
+      let csv=[header,...rows].map(r=>r.join(",")).join("\r\n");
+      const blob=new Blob([csv],{type:'text/csv'}), url=URL.createObjectURL(blob);
+      const a=document.createElement('a'); a.href=url; a.download='expenses.csv';
+      document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    }
+    
+    function showAnalytics(){
+      const byCat={}, userBal={}; userList.forEach(u=>userBal[u]=0);
+      expenses.forEach(e=>{
+        byCat[e.category]=(byCat[e.category]||0)+e.amount;
+        e.people.forEach(p=>userBal[p]-=e.eachPays);
+        userBal[e.recordedBy]+=e.amount;
+      });
+      
+      const top5=[...expenses].sort((a,b)=>b.amount-a.amount).slice(0,5);
+      const overlay=document.createElement('div'); overlay.className='modal-overlay';
+      const modal=document.createElement('div'); modal.className='modal';
+      
+      modal.innerHTML=`
+        <div class="flex justify-between items-center mb-6">
+          <h2 class="text-xl font-bold text-gray-800">
+            <i class="fas fa-chart-pie mr-2 text-blue-500"></i>Expense Analytics
+          </h2>
+          <button onclick="document.body.removeChild(this.closest('.modal-overlay'))" 
+                  class="text-gray-500 hover:text-gray-700">
+            <i class="fas fa-times"></i>
+          </button>
+        </div>
+        
+        <div class="grid gap-6">
+          <div class="card p-5">
+            <h3 class="font-semibold mb-4 flex items-center text-gray-700">
+              <i class="fas fa-tags mr-2 text-blue-500"></i>By Category
+            </h3>
+            <div class="space-y-3">${
+              Object.entries(byCat)
+                .sort((a,b)=>b[1]-a[1])
+                .map(([c,t])=>`
+                  <div class="flex items-center justify-between">
+                    <span class="flex items-center text-gray-700">
+                      ${getCategoryIcon(c)} ${c||'Uncategorized'}
+                    </span>
+                    <span class="font-medium">$${t.toFixed(2)}</span>
+                  </div>`)
+                .join('')
+            }</div>
+          </div>
+          
+          <div class="card p-5">
+            <h3 class="font-semibold mb-4 flex items-center text-gray-700">
+              <i class="fas fa-users mr-2 text-blue-500"></i>User Balances
+            </h3>
+            <div class="space-y-3">${
+              Object.entries(userBal)
+                .map(([u,t])=>`
+                  <div class="flex items-center justify-between">
+                    <span class="flex items-center text-gray-700">
+                      <i class="fas fa-user-circle mr-2 ${
+                        t>=0?'text-green-500':'text-red-500'
+                      }"></i>${u}
+                    </span>
+                    <span class="font-medium ${
+                      t>=0?'text-green-600':'text-red-600'
+                    }">
+                      ${t>=0?'+':''}$${Math.abs(t).toFixed(2)}
+                    </span>
+                  </div>`)
+                .join('')
+            }</div>
+          </div>
+          
+          <div class="card p-5">
+            <h3 class="font-semibold mb-4 flex items-center text-gray-700">
+              <i class="fas fa-star mr-2 text-blue-500"></i>Top 5 Expenses
+            </h3>
+            <table class="w-full text-sm">
+              <thead>
+                <tr class="text-left border-b">
+                  <th class="pb-2 text-gray-700">Date</th>
+                  <th class="pb-2 text-gray-700">Category</th>
+                  <th class="pb-2 text-gray-700">Amount</th>
+                </tr>
+              </thead>
+              <tbody>${
+                top5.map(e=>`
+                  <tr class="border-b">
+                    <td class="py-3 text-gray-600">${e.date}</td>
+                    <td class="py-3 text-gray-600">${e.category||'-'}</td>
+                    <td class="py-3 font-medium">$${e.amount.toFixed(2)}</td>
+                  </tr>`).join('')
+              }</tbody>
+            </table>
+          </div>
+        </div>
+        
+        <div class="mt-6 text-right">
+          <button onclick="document.body.removeChild(this.closest('.modal-overlay'))" 
+                  class="px-4 py-2 bg-gray-100 hover:bg-gray-200 rounded-lg text-gray-700 transition-colors">
+            Close
+          </button>
+        </div>`;
+      
+      overlay.appendChild(modal); 
+      document.body.appendChild(overlay);
+    }
+
+    document.addEventListener("DOMContentLoaded",()=>{
+      const u=localStorage.getItem("userLoggedIn");
+      if(u) showMainApp(u);
+      document.getElementById('amount').addEventListener('input',updateEachPays);
+      document.getElementById('type').addEventListener('change',updateEachPays);
+      document.querySelectorAll('.view-tab').forEach(t=>
+        t.addEventListener('click',()=>changeView(t.id.replace('view-','')))
+      );
+      
+      // Close dropdown when clicking outside
+      document.addEventListener('click', (e) => {
+        if (!e.target.closest('#peopleMenu') && !e.target.closest('[onclick*="peopleMenu"]')) {
+          document.getElementById('peopleMenu').classList.add('hidden');
+        }
+      });
     });
   </script>
 </head>
-<body class="bg-white text-black min-h-screen">
-  <div id="loginContainer" class="flex items-center justify-center min-h-screen">
-    <div class="max-w-sm mx-auto p-6 bg-gray-100 rounded-xl shadow-lg text-center">
-      <h2 class="text-2xl font-semibold mb-6">👋 Expense Tracker</h2>
+<body>
+  <!-- Login Screen -->
+  <div id="loginContainer" class="flex items-center justify-center min-h-screen bg-gray-50">
+    <div class="w-full max-w-md mx-4 p-8 bg-white rounded-xl shadow-sm border border-gray-200">
+      <div class="text-center mb-8">
+        <div class="w-20 h-20 bg-blue-50 rounded-full flex items-center justify-center mx-auto mb-4">
+          <i class="fas fa-wallet text-blue-500 text-3xl"></i>
+        </div>
+        <h2 class="text-3xl font-bold text-gray-800 mb-2">Expense Tracker</h2>
+        <p class="text-gray-600">Track and manage shared expenses</p>
+      </div>
       <div class="mb-6">
-        <input id="loginCode" type="password" maxlength="4" placeholder="Enter 4-digit code" 
-               class="w-full mb-4 px-4 py-3 border rounded text-center text-lg" 
-               onkeypress="if(event.key === 'Enter') validateLogin()" />
-        <button onclick="validateLogin()" class="w-full bg-black text-white py-3 rounded hover:bg-gray-800 text-lg">
-          Login
-        </button>
-      </div>
-      <p class="text-gray-600 text-sm">Enter your unique 4-digit code to access the tracker</p>
-    </div>
-  </div>
-
-  <div id="appContent" class="hidden px-4 max-w-6xl mx-auto pb-10">
-    <div id="alertBox" class="fixed top-5 right-5 px-4 py-2 rounded shadow opacity-0 transition-opacity"></div>
-    
-    <div class="flex justify-between items-center py-4 border-b">
-      <h1 id="heading" class="text-2xl font-bold">👥 Group Expense Tracker</h1>
-      <button onclick="logout()" class="bg-black text-white px-4 py-2 rounded hover:opacity-90">Logout</button>
-    </div>
-
-    <!-- Form and Table Area -->
-    <form class="bg-gray-100 p-6 rounded-xl shadow-md space-y-4 mb-6 mt-6">
-      <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <div>
-          <label class="block text-sm font-medium mb-1">Date</label>
-          <input type="date" id="date" class="w-full px-4 py-2 rounded border" required />
-        </div>
-        <div>
-          <label class="block text-sm font-medium mb-1">Session</label>
-          <select id="session" class="w-full px-4 py-2 rounded border">
-            <option>Morning</option>
-            <option>Afternoon</option>
-            <option>Evening</option>
-          </select>
-        </div>
-        <div>
-          <label class="block text-sm font-medium mb-1">Type</label>
-          <select id="type" class="w-full px-4 py-2 rounded border">
-            <option>Credit</option>
-            <option>Debit</option>
-          </select>
-        </div>
-      </div>
-      <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <div>
-          <label class="block text-sm font-medium mb-1">Amount ($)</label>
-          <input type="number" id="amount" placeholder="0.00" step="0.01" 
-                 class="w-full px-4 py-2 rounded border" required />
-        </div>
-        <div>
-          <label class="block text-sm font-medium mb-1">Category</label>
-          <input type="text" id="category" placeholder="Food, Rent, etc." 
-                 class="w-full px-4 py-2 rounded border" />
-        </div>
-        <div>
-  <label class="block text-sm font-medium mb-1">Each Pays</label>
-  <div class="w-full px-4 py-2 rounded border bg-gray-50">
-    $<span id="eachPaysDisplay">0.00</span>
-    <span id="splitInfo" class="text-sm text-gray-500 ml-2"></span> <!-- 👈 Add this line -->
-  </div>
-</div>
-      </div>
-      <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <div>
-          <label class="block text-sm font-medium mb-1">Recorded by</label>
-          <select id="recordedBy" class="w-full px-4 py-2 rounded border">
-            <option>Babai</option>
-            <option>Harsha</option>
-            <option>Nihal</option>
-            <option>Kiwi</option>
-          </select>
-        </div>
-        <div>
-          <label class="block text-sm font-medium mb-1">Shared With</label>
-          <div class="relative">
-            <button type="button" onclick="document.getElementById('peopleMenu').classList.toggle('hidden')" 
-                    class="w-full px-4 py-2 rounded border bg-white text-left flex justify-between items-center">
-              <span>Select People</span>
-              <i class="fas fa-chevron-down"></i>
-            </button>
-            <div id="peopleMenu" class="absolute bg-white shadow rounded p-2 mt-1 hidden z-10 w-full border">
-              <label class="block p-1 hover:bg-gray-100 rounded"><input type="checkbox" class="personCheck" value="Babai" onchange="updateSelectedChips()" /> Babai</label>
-              <label class="block p-1 hover:bg-gray-100 rounded"><input type="checkbox" class="personCheck" value="Harsha" onchange="updateSelectedChips()" /> Harsha</label>
-              <label class="block p-1 hover:bg-gray-100 rounded"><input type="checkbox" class="personCheck" value="Nihal" onchange="updateSelectedChips()" /> Nihal</label>
-              <label class="block p-1 hover:bg-gray-100 rounded"><input type="checkbox" class="personCheck" value="Kiwi" onchange="updateSelectedChips()" /> Kiwi</label>
-              <hr class="my-1 border-gray-200">
-              <label class="block p-1 hover:bg-gray-100 rounded"><input type="checkbox" onchange="toggleAllCheckboxes(this)" /> <strong>Select All</strong></label>
-            </div>
-            <div id="selectedChips" class="mt-2 flex flex-wrap"></div>
+        <div class="relative">
+          <input id="loginCode" type="password" maxlength="4" placeholder="Enter your 4-digit code"
+                 class="w-full px-5 py-3 form-input text-center text-lg focus:ring-2 focus:ring-blue-500"
+                 onkeypress="if(event.key==='Enter') validateLogin()" />
+          <div class="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
+            <i class="fas fa-lock text-gray-400"></i>
           </div>
         </div>
       </div>
-      <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+      <button onclick="validateLogin()" 
+              class="w-full btn-primary text-white py-3 rounded-lg font-medium hover:shadow-md transition-all">
+        <i class="fas fa-sign-in-alt mr-2"></i> Login
+      </button>
+    </div>
+  </div>
+
+  <!-- Main App Content -->
+  <div id="appContent" class="hidden px-4 max-w-7xl mx-auto pb-10">
+    <div id="alertBox" class="fixed top-5 right-5 px-4 py-3 rounded-lg shadow opacity-0 transition-all duration-300"></div>
+    
+    <!-- Header -->
+    <header class="py-8">
+      <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-          <label class="block text-sm font-medium mb-1">Notes</label>
-          <input type="text" id="notes" placeholder="Additional details" 
-                 class="w-full px-4 py-2 rounded border" />
+          <h1 id="heading" class="text-2xl font-bold text-gray-800 flex items-center">
+            <i class="fas fa-wallet mr-3 text-blue-500"></i>Group Expense Tracker
+          </h1>
+          <p class="text-gray-600 text-sm mt-1">Track and split expenses with your group</p>
         </div>
-      </div>
-      <div class="flex space-x-2">
-        <button onclick="addEntry(event)" class="flex-1 bg-green-500 text-white py-2 rounded hover:bg-green-600">
-          <i class="fas fa-plus mr-2"></i> Add Entry
-        </button>
-        <button type="button" onclick="resetForm()" class="bg-gray-500 text-white py-2 px-4 rounded hover:bg-gray-600">
-          <i class="fas fa-times"></i>
+        <button onclick="logout()" 
+                class="flex items-center bg-gray-800 text-white px-5 py-2.5 rounded-lg hover:bg-gray-900 transition-colors">
+          <i class="fas fa-sign-out-alt mr-2"></i>Logout
         </button>
       </div>
-    </form>
+    </header>
 
-    <!-- View Tabs -->
-    <div class="flex border-b mb-4">
-      <div id="view-all" class="tab view-tab active" onclick="changeView('all')">All Expenses</div>
-      <div id="view-weekly" class="tab view-tab" onclick="changeView('weekly')">Weekly</div>
-      <div id="view-monthly" class="tab view-tab" onclick="changeView('monthly')">Monthly</div>
-      <div id="view-user" class="tab view-tab" onclick="changeView('user')">My Expenses</div>
-    </div>
+    <!-- Main Content -->
+    <main class="max-w-6xl mx-auto">
+      <!-- Add Expense Section -->
+      <section class="mb-8">
+        <div class="card p-6">
+          <h2 class="text-xl font-semibold text-gray-800 mb-6 flex items-center">
+            <i class="fas fa-plus-circle mr-3 text-blue-500"></i>Add New Expense
+          </h2>
+          
+          <form class="space-y-5">
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+              <!-- Date Field -->
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1.5">Date</label>
+                <div class="relative">
+                  <input type="date" id="date" class="w-full form-input px-4 py-2.5" required />
+                  <div class="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
+                    <i class="fas fa-calendar text-gray-400"></i>
+                  </div>
+                </div>
+              </div>
+              
+              <!-- Session Field -->
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1.5">Time of Day</label>
+                <div class="relative">
+                  <select id="session" class="w-full form-input px-4 py-2.5">
+                    <option>Morning</option>
+                    <option>Afternoon</option>
+                    <option>Evening</option>
+                  </select>
+                  <div class="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
+                    <i class="fas fa-clock text-gray-400"></i>
+                  </div>
+                </div>
+              </div>
+              
+              <!-- Type Field -->
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1.5">Transaction Type</label>
+                <div class="relative">
+                  <select id="type" class="w-full form-input px-4 py-2.5">
+                    <option>Credit</option>
+                    <option>Debit</option>
+                  </select>
+                  <div class="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
+                    <i class="fas fa-exchange-alt text-gray-400"></i>
+                  </div>
+                </div>
+              </div>
+              
+              <!-- Amount Field -->
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1.5">Amount ($)</label>
+                <div class="relative">
+                  <input type="number" id="amount" placeholder="0.00" step="0.01" 
+                         class="w-full form-input px-4 py-2.5" required />
+                  <div class="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
+                    <i class="fas fa-dollar-sign text-gray-400"></i>
+                  </div>
+                </div>
+              </div>
+              
+              <!-- Category Field -->
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1.5">Category</label>
+                <div class="relative">
+                  <input type="text" id="category" placeholder="Select or enter category" 
+                         class="w-full form-input px-4 py-2.5" list="categories" />
+                  <div class="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
+                    <i class="fas fa-tag text-gray-400"></i>
+                  </div>
+                </div>
+                <datalist id="categories">
+                  <option>Food</option>
+                  <option>Rent</option>
+                  <option>Transport</option>
+                  <option>Shopping</option>
+                  <option>Entertainment</option>
+                  <option>Utilities</option>
+                  <option>Travel</option>
+                  <option>Health</option>
+                </datalist>
+              </div>
+              
+              <!-- Each Pays Field -->
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1.5">Split Amount</label>
+                <div class="w-full px-4 py-2.5 rounded-lg border border-gray-200 bg-gray-50 flex items-center">
+                  <i class="fas fa-user-friends mr-3 text-gray-500"></i>
+                  <div>
+                    <span class="font-medium">$<span id="eachPaysDisplay">0.00</span></span>
+                    <span id="splitInfo" class="text-xs text-gray-500 ml-2 block">Select at least one person</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+            
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
+              <!-- Recorded By Field -->
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1.5">Recorded By</label>
+                <div class="relative">
+                  <select id="recordedBy" class="w-full form-input px-4 py-2.5">
+                    <option>Babai</option>
+                    <option>Harsha</option>
+                    <option>Nihal</option>
+                    <option>Kiwi</option>
+                  </select>
+                  <div class="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
+                    <i class="fas fa-user-edit text-gray-400"></i>
+                  </div>
+                </div>
+              </div>
+              
+              <!-- Shared With Field -->
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1.5">Shared With</label>
+                <div class="relative">
+                  <button type="button" onclick="document.getElementById('peopleMenu').classList.toggle('hidden')"
+                          class="w-full px-4 py-2.5 rounded-lg border border-gray-200 bg-white text-left flex justify-between items-center hover:border-gray-300 transition-colors">
+                    <span class="text-gray-700">Select people</span>
+                    <i class="fas fa-chevron-down text-gray-500"></i>
+                  </button>
+                  <div id="peopleMenu" class="dropdown-menu absolute bg-white shadow-md rounded-lg p-2 mt-1 hidden z-10 w-full border border-gray-200">
+                    <label class="flex items-center p-2 hover:bg-gray-100 rounded-md cursor-pointer">
+                      <input type="checkbox" class="personCheck mr-3 h-4 w-4" value="Babai" onchange="updateSelectedChips()" />
+                      <i class="fas fa-user mr-2 text-gray-500"></i>Babai
+                    </label>
+                    <label class="flex items-center p-2 hover:bg-gray-100 rounded-md cursor-pointer">
+                      <input type="checkbox" class="personCheck mr-3 h-4 w-4" value="Harsha" onchange="updateSelectedChips()" />
+                      <i class="fas fa-user mr-2 text-gray-500"></i>Harsha
+                    </label>
+                    <label class="flex items-center p-2 hover:bg-gray-100 rounded-md cursor-pointer">
+                      <input type="checkbox" class="personCheck mr-3 h-4 w-4" value="Nihal" onchange="updateSelectedChips()" />
+                      <i class="fas fa-user mr-2 text-gray-500"></i>Nihal
+                    </label>
+                    <label class="flex items-center p-2 hover:bg-gray-100 rounded-md cursor-pointer">
+                      <input type="checkbox" class="personCheck mr-3 h-4 w-4" value="Kiwi" onchange="updateSelectedChips()" />
+                      <i class="fas fa-user mr-2 text-gray-500"></i>Kiwi
+                    </label>
+                    <hr class="my-2 border-gray-200" />
+                    <label class="flex items-center p-2 hover:bg-gray-100 rounded-md cursor-pointer">
+                      <input type="checkbox" class="mr-3 h-4 w-4" onchange="toggleAllCheckboxes(this)" />
+                      <i class="fas fa-users mr-2 text-gray-500"></i>Select All
+                    </label>
+                  </div>
+                  <div id="selectedChips" class="mt-2 flex flex-wrap gap-2"></div>
+                </div>
+              </div>
+            </div>
+            
+            <!-- Notes Field -->
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1.5">Notes</label>
+              <div class="relative">
+                <input type="text" id="notes" placeholder="Add any additional details" 
+                       class="w-full form-input px-4 py-2.5" />
+                <div class="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
+                  <i class="fas fa-sticky-note text-gray-400"></i>
+                </div>
+              </div>
+            </div>
+            
+            <!-- Form Actions -->
+            <div class="flex flex-col sm:flex-row gap-3 pt-2">
+              <button id="submitBtn" onclick="addEntry(event)" 
+                      class="btn-primary text-white py-2.5 px-5 rounded-lg hover:shadow-md transition-all flex-1 flex items-center justify-center">
+                <i class="fas fa-plus mr-2"></i> Add Expense
+              </button>
+              <button type="button" onclick="resetForm()" 
+                      class="bg-gray-100 text-gray-700 py-2.5 px-5 rounded-lg border border-gray-200 hover:bg-gray-200 transition-colors flex items-center justify-center">
+                <i class="fas fa-times mr-2"></i> Clear Form
+              </button>
+            </div>
+          </form>
+        </div>
+      </section>
 
-    <!-- Summary Cards -->
-    <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 text-center mb-6">
-      <div class="bg-white rounded p-4 font-bold text-green-600 shadow border">
-        <div class="text-sm">💰 Total Income</div>
-        <div class="text-xl">$<span id="totalIncome">0.00</span></div>
-      </div>
-      <div class="bg-white rounded p-4 font-bold text-red-500 shadow border">
-        <div class="text-sm">📉 Total Expense</div>
-        <div class="text-xl">$<span id="totalExpense">0.00</span></div>
-      </div>
-      <div class="bg-white rounded p-4 font-bold text-blue-500 shadow border">
-        <div class="text-sm">⚖️ Net Balance</div>
-        <div class="text-xl">$<span id="netBalance">0.00</span></div>
-      </div>
-    </div>
+      <!-- Filters Section -->
+      <section class="mb-6">
+        <div class="card p-5">
+          <div class="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+            <!-- View Tabs -->
+            <div class="flex border-b border-gray-200">
+              <button id="view-all" class="tab view-tab active px-4 py-2 flex items-center">
+                <i class="fas fa-list mr-2"></i>All
+              </button>
+              <button id="view-weekly" class="tab view-tab px-4 py-2 flex items-center">
+                <i class="fas fa-calendar-week mr-2"></i>Weekly
+              </button>
+              <button id="view-monthly" class="tab view-tab px-4 py-2 flex items-center">
+                <i class="fas fa-calendar-alt mr-2"></i>Monthly
+              </button>
+              <button id="view-user" class="tab view-tab px-4 py-2 flex items-center">
+                <i class="fas fa-user mr-2"></i>Mine
+              </button>
+            </div>
+            
+            <!-- Filter Controls -->
+            <div class="flex flex-col sm:flex-row items-start sm:items-center gap-3 w-full md:w-auto">
+              <!-- Date Range -->
+              <div class="flex items-center bg-gray-50 rounded-lg p-2 border border-gray-200">
+                <i class="fas fa-calendar-alt mr-2 text-gray-500"></i>
+                <input type="date" id="startDate" class="border rounded-md px-2 py-1 text-sm bg-white" onchange="renderExpenses()" />
+                <span class="mx-2 text-gray-400">to</span>
+                <input type="date" id="endDate" class="border rounded-md px-2 py-1 text-sm bg-white" onchange="renderExpenses()" />
+              </div>
+              
+              <!-- My Records Toggle -->
+              <label class="flex items-center bg-gray-50 rounded-lg p-2 border border-gray-200 cursor-pointer">
+                <input type="checkbox" id="myRecordsToggle" class="mr-2 h-4 w-4" onchange="toggleMyRecords()" />
+                <span class="text-sm text-gray-700 flex items-center">
+                  <i class="fas fa-filter mr-2 text-gray-500"></i>My Records
+                </span>
+              </label>
+              
+              <!-- Action Buttons -->
+              <div class="flex items-center gap-2">
+                <button onclick="showAnalytics()" 
+                        class="bg-white text-blue-600 px-4 py-2 rounded-lg border border-blue-200 hover:bg-blue-50 transition-colors flex items-center">
+                  <i class="fas fa-chart-pie mr-2"></i>Analytics
+                </button>
+                <button onclick="exportCSV()" 
+                        class="bg-white text-gray-700 px-4 py-2 rounded-lg border border-gray-200 hover:bg-gray-50 transition-colors flex items-center">
+                  <i class="fas fa-file-export mr-2"></i>Export
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
 
-    <!-- User Balances -->
-    <div class="mb-6">
-      <h3 class="text-lg font-semibold mb-2">👥 User Balances</h3>
-      <div id="userBalances" class="grid grid-cols-2 sm:grid-cols-4 gap-4"></div>
-    </div>
+      <!-- Summary Cards -->
+      <section class="mb-6">
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-5">
+          <!-- Total Income -->
+          <div class="card p-5">
+            <div class="flex items-center justify-between">
+              <div>
+                <div class="text-sm text-gray-600 mb-1 flex items-center">
+                  <i class="fas fa-arrow-up mr-2 text-green-500"></i>Total Income
+                </div>
+                <div class="text-2xl font-bold text-green-600">$<span id="totalIncome">0.00</span></div>
+              </div>
+              <div class="bg-green-50 p-3 rounded-full">
+                <i class="fas fa-coins text-green-500 text-xl"></i>
+              </div>
+            </div>
+          </div>
+          
+          <!-- Total Expense -->
+          <div class="card p-5">
+            <div class="flex items-center justify-between">
+              <div>
+                <div class="text-sm text-gray-600 mb-1 flex items-center">
+                  <i class="fas fa-arrow-down mr-2 text-red-500"></i>Total Expense
+                </div>
+                <div class="text-2xl font-bold text-red-500">$<span id="totalExpense">0.00</span></div>
+              </div>
+              <div class="bg-red-50 p-3 rounded-full">
+                <i class="fas fa-receipt text-red-500 text-xl"></i>
+              </div>
+            </div>
+          </div>
+          
+          <!-- Net Balance -->
+          <div class="card p-5">
+            <div class="flex items-center justify-between">
+              <div>
+                <div class="text-sm text-gray-600 mb-1 flex items-center">
+                  <i class="fas fa-balance-scale mr-2 text-blue-500"></i>Net Balance
+                </div>
+                <div class="text-2xl font-bold text-blue-500">$<span id="netBalance">0.00</span></div>
+              </div>
+              <div class="bg-blue-50 p-3 rounded-full">
+                <i class="fas fa-scale-balanced text-blue-500 text-xl"></i>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
 
-    <!-- Expenses Table -->
-    <div class="overflow-x-auto bg-white rounded-lg shadow border">
-      <table class="w-full responsive-table">
-        <thead>
-          <tr class="text-left border-b bg-gray-100">
-            <th class="p-2 whitespace-nowrap">Date</th>
-            <th class="p-2">Ses</th>
-            <th class="p-2">T</th>
-            <th class="p-2">Amount</th>
-            <th class="p-2">Category</th>
-            <th class="p-2">Notes</th>
-            <th class="p-2">People</th>
-            <th class="p-2">Each</th>
-            <th class="p-2">By</th>
-            <th class="p-2">Actions</th>
-          </tr>
-        </thead>
-        <tbody id="tableBody"></tbody>
-      </table>
-    </div>
+      <!-- User Balances -->
+      <section class="mb-8">
+        <h3 class="text-lg font-semibold text-gray-800 mb-4 flex items-center">
+          <i class="fas fa-users mr-2 text-blue-500"></i>User Balances
+        </h3>
+        <div id="userBalances" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5"></div>
+      </section>
+
+      <!-- Expenses Table -->
+      <section>
+        <div class="card overflow-x-auto">
+          <table class="w-full">
+            <thead>
+              <tr class="text-left border-b bg-gray-50">
+                <th class="p-4 text-sm font-semibold text-gray-700 whitespace-nowrap">
+                  <i class="fas fa-calendar mr-2"></i>Date
+                </th>
+                <th class="p-4 text-sm font-semibold text-gray-700 whitespace-nowrap">
+                  <i class="fas fa-clock mr-2"></i>Time
+                </th>
+                <th class="p-4 text-sm font-semibold text-gray-700 whitespace-nowrap">
+                  <i class="fas fa-exchange-alt mr-2"></i>Type
+                </th>
+                <th class="p-4 text-sm font-semibold text-gray-700 whitespace-nowrap">
+                  <i class="fas fa-dollar-sign mr-2"></i>Amount
+                </th>
+                <th class="p-4 text-sm font-semibold text-gray-700 whitespace-nowrap">
+                  <i class="fas fa-tag mr-2"></i>Category
+                </th>
+                <th class="p-4 text-sm font-semibold text-gray-700 whitespace-nowrap">
+                  <i class="fas fa-note mr-2"></i>Notes
+                </th>
+                <th class="p-4 text-sm font-semibold text-gray-700 whitespace-nowrap">
+                  <i class="fas fa-user-friends mr-2"></i>People
+                </th>
+                <th class="p-4 text-sm font-semibold text-gray-700 whitespace-nowrap">
+                  <i class="fas fa-user mr-2"></i>Each
+                </th>
+                <th class="p-4 text-sm font-semibold text-gray-700 whitespace-nowrap">
+                  <i class="fas fa-user-edit mr-2"></i>By
+                </th>
+                <th class="p-4 text-sm font-semibold text-gray-700 whitespace-nowrap">
+                  <i class="fas fa-cog mr-2"></i>Actions
+                </th>
+              </tr>
+            </thead>
+            <tbody id="tableBody"></tbody>
+          </table>
+        </div>
+      </section>
+    </main>
   </div>
 </body>
 </html>
