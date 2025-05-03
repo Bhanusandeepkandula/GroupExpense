@@ -35,6 +35,22 @@
     .table-row:hover {
       background-color: #f8f8f8;
     }
+    .user-balance {
+      transition: all 0.3s;
+    }
+    .user-balance:hover {
+      transform: scale(1.05);
+    }
+    .tab {
+      cursor: pointer;
+      padding: 8px 16px;
+      border-radius: 8px 8px 0 0;
+    }
+    .tab.active {
+      background-color: #f3f4f6;
+      font-weight: bold;
+      border-bottom: 2px solid #3b82f6;
+    }
   </style>
   <script>
     // Firebase configuration
@@ -54,9 +70,11 @@
     const database = firebase.database();
 
     const users = { "6301": "Babai", "2806": "Harsha", "6969": "Nihal", "0400": "Kiwi" };
+    const userList = ["Babai", "Harsha", "Nihal", "Kiwi"];
     let expenses = [];
     let editIndex = -1;
     let currentUser = null;
+    let currentView = "all"; // "all", "weekly", "monthly", "user"
 
     // Initialize the app
     function initApp() {
@@ -121,6 +139,9 @@
         chip.textContent = checkbox.value;
         chipsContainer.appendChild(chip);
       });
+      
+      // Update each pays amount when people selection changes
+      updateEachPays();
     }
 
     function toggleAllCheckboxes(source) {
@@ -130,6 +151,35 @@
       });
       updateSelectedChips();
     }
+    
+   function updateEachPays() {
+  const amount = parseFloat(document.getElementById('amount').value);
+  const type = document.getElementById('type').value;
+  const checkboxes = document.querySelectorAll('.personCheck:checked');
+  const splitInfo = document.getElementById('splitInfo');
+
+  if (isNaN(amount)) {
+    document.getElementById('eachPaysDisplay').textContent = "0.00";
+    splitInfo.textContent = "";
+    return;
+  }
+
+  if (type === 'Credit') {
+    document.getElementById('eachPaysDisplay').textContent = amount.toFixed(2);
+    splitInfo.textContent = "(Full amount received)";
+  } else {
+    if (checkboxes.length === 0) {
+      document.getElementById('eachPaysDisplay').textContent = "0.00";
+      splitInfo.textContent = "(No one selected)";
+      return;
+    }
+    const eachPays = amount / checkboxes.length;
+    document.getElementById('eachPaysDisplay').textContent = eachPays.toFixed(2);
+    splitInfo.textContent = `(Split among ${checkboxes.length} ${checkboxes.length === 1 ? "person" : "people"})`;
+  }
+}
+
+
 
     // Expense CRUD operations with Firebase
     function loadExpenses() {
@@ -145,6 +195,7 @@
         }
         renderExpenses();
         updateTotals();
+        updateUserBalances();
       });
     }
 
@@ -169,7 +220,7 @@
         return;
       }
       
-      const eachPays = type === 'Credit' ? amount : (amount / people.length).toFixed(2);
+      const eachPays = type === 'Credit' ? amount : (amount / people.length);
       
       const entry = {
         date,
@@ -235,6 +286,7 @@
       updateSelectedChips();
       editIndex = index;
       document.querySelector('button[onclick="addEntry(event)"]').textContent = 'Update Entry';
+      document.getElementById('eachPaysDisplay').textContent = entry.eachPays.toFixed(2);
       window.scrollTo({ top: 0, behavior: 'smooth' });
     }
 
@@ -255,6 +307,7 @@
       document.querySelector('form').reset();
       document.getElementById('selectedChips').innerHTML = '';
       document.getElementById('date').valueAsDate = new Date();
+      document.getElementById('eachPaysDisplay').textContent = '0.00';
       updateSessionByTime();
       editIndex = -1;
       document.querySelector('button[onclick="addEntry(event)"]').textContent = '+ Add Entry';
@@ -264,14 +317,32 @@
       const tbody = document.getElementById('tableBody');
       tbody.innerHTML = '';
       
-      if (expenses.length === 0) {
+      let filteredExpenses = expenses;
+      
+      // Apply filters based on current view
+      const now = new Date();
+      switch(currentView) {
+        case "weekly":
+          const oneWeekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+          filteredExpenses = expenses.filter(exp => new Date(exp.date) >= oneWeekAgo);
+          break;
+        case "monthly":
+          const oneMonthAgo = new Date(now.getFullYear(), now.getMonth() - 1, now.getDate());
+          filteredExpenses = expenses.filter(exp => new Date(exp.date) >= oneMonthAgo);
+          break;
+        case "user":
+          filteredExpenses = expenses.filter(exp => exp.people.includes(currentUser) || exp.recordedBy === currentUser);
+          break;
+      }
+      
+      if (filteredExpenses.length === 0) {
         const row = document.createElement('tr');
-        row.innerHTML = `<td colspan="10" class="py-4 text-center text-gray-500">No expenses recorded yet</td>`;
+        row.innerHTML = `<td colspan="10" class="py-4 text-center text-gray-500">No expenses found</td>`;
         tbody.appendChild(row);
         return;
       }
       
-      expenses.forEach((expense, index) => {
+      filteredExpenses.forEach((expense, index) => {
         const row = document.createElement('tr');
         row.className = 'table-row border-b';
         
@@ -290,13 +361,13 @@
           <td class="px-2">${expense.category || '-'}</td>
           <td class="px-2 truncate max-w-xs">${expense.notes || '-'}</td>
           <td class="px-2">${peopleList}</td>
-          <td class="px-2">$${expense.eachPays}</td>
+          <td class="px-2">$${expense.eachPays.toFixed(2)}</td>
           <td class="px-2">${expense.recordedBy}</td>
           <td class="px-2 whitespace-nowrap">
-            <button onclick="editEntry(${index})" class="text-blue-500 hover:text-blue-700 mr-2">
+            <button onclick="editEntry(${expenses.findIndex(e => e.id === expense.id)})" class="text-blue-500 hover:text-blue-700 mr-2">
               <i class="fas fa-edit"></i>
             </button>
-            <button onclick="deleteEntry(${index})" class="text-red-500 hover:text-red-700">
+            <button onclick="deleteEntry(${expenses.findIndex(e => e.id === expense.id)})" class="text-red-500 hover:text-red-700">
               <i class="fas fa-trash"></i>
             </button>
           </td>
@@ -326,6 +397,56 @@
       document.getElementById('totalExpense').textContent = totalExpense.toFixed(2);
       document.getElementById('netBalance').textContent = (totalIncome - totalExpense).toFixed(2);
     }
+    
+    function updateUserBalances() {
+      const balances = {};
+      userList.forEach(user => {
+        balances[user] = 0;
+      });
+      
+      expenses.forEach(expense => {
+        if (expense.type === 'Credit') {
+          // Credit is added to the recordedBy user
+          balances[expense.recordedBy] += expense.amount;
+        } else {
+          // Debit is split among selected people
+          const eachPays = expense.amount / expense.people.length;
+          expense.people.forEach(person => {
+            balances[person] -= eachPays;
+          });
+          // Recorded by person gets the full amount (they paid it)
+          balances[expense.recordedBy] += expense.amount;
+        }
+      });
+      
+      // Update the UI
+      const container = document.getElementById('userBalances');
+      container.innerHTML = '';
+      
+      userList.forEach(user => {
+        const balance = balances[user];
+        const balanceElement = document.createElement('div');
+        balanceElement.className = `user-balance bg-white rounded p-4 font-bold shadow border text-center ${
+          balance > 0 ? 'text-green-600' : balance < 0 ? 'text-red-500' : 'text-gray-600'
+        }`;
+        balanceElement.innerHTML = `
+          <div class="text-sm">${user}</div>
+          <div class="text-xl">$${balance.toFixed(2)}</div>
+          ${balance > 0 ? '<div class="text-xs mt-1">Gets back</div>' : 
+           balance < 0 ? '<div class="text-xs mt-1">Owes</div>' : ''}
+        `;
+        container.appendChild(balanceElement);
+      });
+    }
+    
+    function changeView(view) {
+      currentView = view;
+      document.querySelectorAll('.view-tab').forEach(tab => {
+        tab.classList.remove('active');
+      });
+      document.getElementById(`view-${view}`).classList.add('active');
+      renderExpenses();
+    }
 
     // Initialize on DOM load
     document.addEventListener("DOMContentLoaded", () => {
@@ -334,6 +455,10 @@
       if (storedUser) {
         showMainApp(storedUser);
       }
+      
+      // Add event listeners for dynamic updates
+      document.getElementById('amount').addEventListener('input', updateEachPays);
+      document.getElementById('type').addEventListener('change', updateEachPays);
     });
   </script>
 </head>
@@ -396,10 +521,12 @@
                  class="w-full px-4 py-2 rounded border" />
         </div>
         <div>
-          <label class="block text-sm font-medium mb-1">Notes</label>
-          <input type="text" id="notes" placeholder="Additional details" 
-                 class="w-full px-4 py-2 rounded border" />
-        </div>
+  <label class="block text-sm font-medium mb-1">Each Pays</label>
+  <div class="w-full px-4 py-2 rounded border bg-gray-50">
+    $<span id="eachPaysDisplay">0.00</span>
+    <span id="splitInfo" class="text-sm text-gray-500 ml-2"></span> <!-- 👈 Add this line -->
+  </div>
+</div>
       </div>
       <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div>
@@ -431,6 +558,13 @@
           </div>
         </div>
       </div>
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div>
+          <label class="block text-sm font-medium mb-1">Notes</label>
+          <input type="text" id="notes" placeholder="Additional details" 
+                 class="w-full px-4 py-2 rounded border" />
+        </div>
+      </div>
       <div class="flex space-x-2">
         <button onclick="addEntry(event)" class="flex-1 bg-green-500 text-white py-2 rounded hover:bg-green-600">
           <i class="fas fa-plus mr-2"></i> Add Entry
@@ -441,6 +575,15 @@
       </div>
     </form>
 
+    <!-- View Tabs -->
+    <div class="flex border-b mb-4">
+      <div id="view-all" class="tab view-tab active" onclick="changeView('all')">All Expenses</div>
+      <div id="view-weekly" class="tab view-tab" onclick="changeView('weekly')">Weekly</div>
+      <div id="view-monthly" class="tab view-tab" onclick="changeView('monthly')">Monthly</div>
+      <div id="view-user" class="tab view-tab" onclick="changeView('user')">My Expenses</div>
+    </div>
+
+    <!-- Summary Cards -->
     <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 text-center mb-6">
       <div class="bg-white rounded p-4 font-bold text-green-600 shadow border">
         <div class="text-sm">💰 Total Income</div>
@@ -456,6 +599,13 @@
       </div>
     </div>
 
+    <!-- User Balances -->
+    <div class="mb-6">
+      <h3 class="text-lg font-semibold mb-2">👥 User Balances</h3>
+      <div id="userBalances" class="grid grid-cols-2 sm:grid-cols-4 gap-4"></div>
+    </div>
+
+    <!-- Expenses Table -->
     <div class="overflow-x-auto bg-white rounded-lg shadow border">
       <table class="w-full responsive-table">
         <thead>
