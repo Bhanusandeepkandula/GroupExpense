@@ -7,6 +7,11 @@
   <script src="https://cdn.tailwindcss.com"></script>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
   <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;700&display=swap" rel="stylesheet">
+  
+  <!-- Firebase SDK -->
+  <script src="https://www.gstatic.com/firebasejs/9.6.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.6.0/firebase-database-compat.js"></script>
+  
   <style>
     body { font-family: 'Manrope', sans-serif; }
     .chip {
@@ -32,14 +37,30 @@
     }
   </style>
   <script>
+    // Firebase configuration
+    const firebaseConfig = {
+      apiKey: "AIzaSyB-domZ-auX6gjlVd8PUtQNejIbnI6s4pU",
+      authDomain: "babai-bd396.firebaseapp.com",
+      databaseURL: "https://babai-bd396-default-rtdb.firebaseio.com",
+      projectId: "babai-bd396",
+      storageBucket: "babai-bd396.appspot.com",
+      messagingSenderId: "35426041175",
+      appId: "1:35426041175:web:062b896e01dcb17c325212",
+      measurementId: "G-ZCHCMW26LF"
+    };
+
+    // Initialize Firebase
+    const app = firebase.initializeApp(firebaseConfig);
+    const database = firebase.database();
+
     const users = { "6301": "Babai", "2806": "Harsha", "6969": "Nihal", "0400": "Kiwi" };
     let expenses = [];
     let editIndex = -1;
+    let currentUser = null;
 
     // Initialize the app
     function initApp() {
       loadExpenses();
-      updateTotals();
       updateSessionByTime();
       document.getElementById('date').valueAsDate = new Date();
     }
@@ -48,8 +69,9 @@
     function validateLogin() {
       const code = document.getElementById("loginCode").value;
       if (users[code]) {
-        localStorage.setItem("userLoggedIn", users[code]);
-        showMainApp(users[code]);
+        currentUser = users[code];
+        localStorage.setItem("userLoggedIn", currentUser);
+        showMainApp(currentUser);
       } else {
         showAlert("❌ Wrong 4-digit code. Please try again.");
       }
@@ -66,6 +88,7 @@
 
     function logout() {
       localStorage.removeItem("userLoggedIn");
+      currentUser = null;
       location.reload();
     }
 
@@ -108,17 +131,21 @@
       updateSelectedChips();
     }
 
-    // Expense CRUD operations
+    // Expense CRUD operations with Firebase
     function loadExpenses() {
-      const savedExpenses = localStorage.getItem('groupExpenses');
-      if (savedExpenses) {
-        expenses = JSON.parse(savedExpenses);
+      const expensesRef = database.ref('expenses');
+      expensesRef.orderByChild('timestamp').on('value', (snapshot) => {
+        const data = snapshot.val();
+        if (data) {
+          // Convert object to array and sort by timestamp (newest first)
+          expenses = Object.entries(data).map(([key, value]) => ({ id: key, ...value }));
+          expenses.sort((a, b) => b.timestamp - a.timestamp);
+        } else {
+          expenses = [];
+        }
         renderExpenses();
-      }
-    }
-
-    function saveExpenses() {
-      localStorage.setItem('groupExpenses', JSON.stringify(expenses));
+        updateTotals();
+      });
     }
 
     function addEntry(e) {
@@ -153,23 +180,36 @@
         notes,
         recordedBy,
         people,
-        eachPays
+        eachPays,
+        timestamp: firebase.database.ServerValue.TIMESTAMP
       };
       
-      if (editIndex >= 0) {
-        expenses[editIndex] = entry;
-        editIndex = -1;
-        document.querySelector('button[onclick="addEntry(event)"]').textContent = '+ Add Entry';
-        showAlert("✅ Expense updated successfully!", 'success');
-      } else {
-        expenses.push(entry);
-        showAlert("✅ Expense added successfully!", 'success');
-      }
+      const expensesRef = database.ref('expenses');
       
-      saveExpenses();
-      renderExpenses();
-      updateTotals();
-      resetForm();
+      if (editIndex >= 0) {
+        // Update existing expense
+        const expenseId = expenses[editIndex].id;
+        database.ref(`expenses/${expenseId}`).update(entry)
+          .then(() => {
+            editIndex = -1;
+            document.querySelector('button[onclick="addEntry(event)"]').textContent = '+ Add Entry';
+            showAlert("✅ Expense updated successfully!", 'success');
+            resetForm();
+          })
+          .catch((error) => {
+            showAlert("❌ Error updating expense: " + error.message);
+          });
+      } else {
+        // Add new expense
+        expensesRef.push(entry)
+          .then(() => {
+            showAlert("✅ Expense added successfully!", 'success');
+            resetForm();
+          })
+          .catch((error) => {
+            showAlert("❌ Error adding expense: " + error.message);
+          });
+      }
     }
 
     function editEntry(index) {
@@ -200,11 +240,14 @@
 
     function deleteEntry(index) {
       if (confirm('Are you sure you want to delete this expense?')) {
-        expenses.splice(index, 1);
-        saveExpenses();
-        renderExpenses();
-        updateTotals();
-        showAlert("🗑️ Expense deleted successfully!", 'success');
+        const expenseId = expenses[index].id;
+        database.ref(`expenses/${expenseId}`).remove()
+          .then(() => {
+            showAlert("🗑️ Expense deleted successfully!", 'success');
+          })
+          .catch((error) => {
+            showAlert("❌ Error deleting expense: " + error.message);
+          });
       }
     }
 
@@ -228,10 +271,7 @@
         return;
       }
       
-      // Sort by date (newest first)
-      const sortedExpenses = [...expenses].sort((a, b) => new Date(b.date) - new Date(a.date));
-      
-      sortedExpenses.forEach((expense, index) => {
+      expenses.forEach((expense, index) => {
         const row = document.createElement('tr');
         row.className = 'table-row border-b';
         
@@ -289,8 +329,11 @@
 
     // Initialize on DOM load
     document.addEventListener("DOMContentLoaded", () => {
-      const user = localStorage.getItem("userLoggedIn");
-      if (user) showMainApp(user);
+      // Check if user is already logged in
+      const storedUser = localStorage.getItem("userLoggedIn");
+      if (storedUser) {
+        showMainApp(storedUser);
+      }
     });
   </script>
 </head>
