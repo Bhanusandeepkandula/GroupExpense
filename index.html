@@ -2,102 +2,240 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
   <title>Group Expense Tracker</title>
+
+  <!-- Tailwind CSS -->
   <script src="https://cdn.tailwindcss.com"></script>
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <!-- Font Awesome -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"/>
+  <!-- Work Sans -->
+  <link href="https://fonts.googleapis.com/css2?family=Work+Sans:wght@400;500;600;700&display=swap" rel="stylesheet"/>
+
+  <style>
+    body { font-family:'Work Sans',sans-serif; background:#f8fafc; color:#1f2937 }
+    .card { background:#fff; border-radius:8px; box-shadow:0 2px 8px rgba(0,0,0,0.05); transition:.2s }
+    .card:hover { box-shadow:0 4px 12px rgba(0,0,0,0.1) }
+    .form-input { border:1px solid #e2e8f0; border-radius:8px; transition:.2s }
+    .form-input:focus { border-color:#3b82f6; box-shadow:0 0 0 3px rgba(59,130,246,0.1) }
+    .btn-primary { background:#3b82f6; border-radius:8px; transition:.2s }
+    .btn-primary:hover { background:#2563eb }
+    /* Chips */
+    #selectedChips { position:absolute; top:100%; left:0; right:0; margin-top:.25rem;
+      background:#fff; border:1px solid #e2e8f0; border-radius:8px; padding:.5rem;
+      display:flex; flex-wrap:wrap; gap:.25rem; z-index:20
+    }
+    #selectedChips.hidden { display:none }
+    /* Balances */
+    .balance-card { border-radius:8px; padding:1rem; text-align:center; box-shadow:0 1px 3px rgba(0,0,0,0.1) }
+    .balance-card.positive { border:1px solid #a7f3d0; background:#ecfdf5; color:#065f46 }
+    .balance-card.negative { border:1px solid #fecaca; background:#fef2f2; color:#7f1d1d }
+  </style>
+</head>
+<body class="antialiased">
+
+  <!-- LOGIN -->
+  <div id="loginContainer" class="min-h-screen flex items-center justify-center bg-gray-50 px-4">
+    <div class="w-full max-w-md p-8 card">
+      <div class="text-center mb-6">
+        <i class="fas fa-wallet text-blue-500 text-4xl mb-2"></i>
+        <h2 class="text-2xl font-semibold">Expense Tracker</h2>
+        <p class="text-gray-500">Enter your 4‑digit code</p>
+      </div>
+      <input id="loginCode" type="password" maxlength="4" placeholder="XXXX"
+             class="w-full mb-4 px-4 py-2 form-input text-center text-lg" />
+      <button onclick="validateLogin()"
+              class="w-full btn-primary text-white py-2 font-medium flex items-center justify-center gap-2">
+        <i class="fas fa-sign-in-alt"></i> Login
+      </button>
+    </div>
+  </div>
+
+  <!-- APP -->
+  <div id="appContent" class="hidden px-4 pt-8 pb-16 max-w-5xl mx-auto">
+
+    <!-- HEADER -->
+    <div class="flex justify-between items-center mb-6">
+      <h1 id="heading" class="text-2xl font-semibold flex items-center gap-2">
+        <i class="fas fa-wallet text-blue-500"></i>Tracker
+      </h1>
+      <button onclick="logout()"
+              class="px-4 py-2 bg-gray-800 text-white rounded-md hover:bg-gray-900">
+        Logout
+      </button>
+    </div>
+
+    <!-- FILTERS & ACTIONS -->
+    <div class="card p-4 mb-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 items-center">
+      <select id="viewFilter" onchange="applyFilters()" class="form-input px-3 py-2">
+        <option value="all">All</option>
+        <option value="weekly">Last 7 days</option>
+        <option value="monthly">Last 30 days</option>
+        <option value="mine">Mine</option>
+      </select>
+      <div class="flex gap-2 items-center">
+        <input type="date" id="startDate" onchange="applyFilters()" class="form-input px-2 py-1"/>
+        <span>to</span>
+        <input type="date" id="endDate" onchange="applyFilters()" class="form-input px-2 py-1"/>
+      </div>
+      <button onclick="exportCSV()" class="btn-primary text-white px-4 py-2 flex items-center justify-center">
+        <i class="fas fa-file-export mr-2"></i> Export
+      </button>
+      <button onclick="showAnalytics()" class="btn-primary text-white px-4 py-2 flex items-center justify-center">
+        <i class="fas fa-chart-pie mr-2"></i> Analytics
+      </button>
+    </div>
+
+    <!-- ADD EXPENSE -->
+    <div class="card p-6 mb-8">
+      <h2 class="text-xl font-medium flex items-center gap-2 mb-4">
+        <i class="fas fa-plus-circle text-blue-500"></i>Add Expense
+      </h2>
+      <form onsubmit="addEntry(event)" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 items-end">
+        <div>
+          <label class="block text-sm font-medium mb-1">Date</label>
+          <input id="date" type="date" class="w-full form-input px-3 py-2" required/>
+        </div>
+        <div>
+          <label class="block text-sm font-medium mb-1">Session</label>
+          <select id="session" class="w-full form-input px-3 py-2">
+            <option>Morning</option><option>Afternoon</option><option>Evening</option>
+          </select>
+        </div>
+        <div>
+          <label class="block text-sm font-medium mb-1">Type</label>
+          <select id="type" class="w-full form-input px-3 py-2" onchange="updateEachPays()">
+            <option>Credit</option><option>Debit</option>
+          </select>
+        </div>
+        <div>
+          <label class="block text-sm font-medium mb-1">Amount</label>
+          <input id="amount" type="number" step="0.01" placeholder="0.00"
+                 class="w-full form-input px-3 py-2" oninput="updateEachPays()" required/>
+        </div>
+        <div>
+          <label class="block text-sm font-medium mb-1">Category</label>
+          <input id="category" type="text" placeholder="e.g. Food"
+                 class="w-full form-input px-3 py-2"/>
+        </div>
+        <div class="relative">
+          <label class="block text-sm font-medium mb-1">Shared With</label>
+          <button type="button" onclick="togglePeopleMenu()"
+                  class="w-full form-input px-3 py-2 flex justify-between items-center">
+            <span>Select people</span>
+            <i class="fas fa-chevron-down text-gray-400"></i>
+          </button>
+          <div id="selectedChips" class="hidden"></div>
+          <div id="peopleMenu"
+               class="absolute inset-x-0 top-full bg-white border rounded-md shadow-lg mt-1 z-10 max-h-48 overflow-auto hidden">
+            <label class="flex items-center p-2 hover:bg-gray-100">
+              <input type="checkbox" class="personCheck mr-2" value="Babai" onchange="updateSelectedChips()"/>Babai
+            </label>
+            <label class="flex items-center p-2 hover:bg-gray-100">
+              <input type="checkbox" class="personCheck mr-2" value="Harsha" onchange="updateSelectedChips()"/>Harsha
+            </label>
+            <label class="flex items-center p-2 hover:bg-gray-100">
+              <input type="checkbox" class="personCheck mr-2" value="Nihal" onchange="updateSelectedChips()"/>Nihal
+            </label>
+            <label class="flex items-center p-2 hover:bg-gray-100">
+              <input type="checkbox" class="personCheck mr-2" value="Kiwi" onchange="updateSelectedChips()"/>Kiwi
+            </label>
+            <hr class="my-2"/>
+            <label class="flex items-center p-2 hover:bg-gray-100">
+              <input type="checkbox" onclick="toggleAllCheckboxes(this)" class="mr-2"/>Select All
+            </label>
+          </div>
+        </div>
+        <div class="sm:col-span-2 lg:col-span-2">
+          <label class="block text-sm font-medium mb-1">Notes</label>
+          <input id="notes" type="text" placeholder="Add details…"
+                 class="w-full form-input px-3 py-2"/>
+        </div>
+        <div>
+          <label class="block text-sm font-medium mb-1">Split Amount</label>
+          <div class="w-full form-input px-3 py-2 bg-gray-50 rounded-md flex justify-between">
+            <span>$<span id="eachPaysDisplay">0.00</span></span>
+            <span id="splitInfo" class="text-gray-500 text-xs">Select people</span>
+          </div>
+        </div>
+        <div class="sm:col-span-2 flex justify-end space-x-4">
+          <button type="button" onclick="resetForm()"
+                  class="px-6 py-2 border rounded-md text-gray-700 hover:bg-gray-100">
+            Clear
+          </button>
+          <button type="submit"
+                  class="btn-primary px-6 py-2 text-white">
+            Add
+          </button>
+        </div>
+      </form>
+    </div>
+
+    <!-- SUMMARY CARDS -->
+    <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
+      <div class="card p-4 flex items-center justify-between">
+        <div>
+          <div class="text-sm text-gray-600 flex items-center gap-1">
+            <i class="fas fa-arrow-up text-green-500"></i>Total Income
+          </div>
+          <div id="totalIncome" class="text-2xl font-bold text-green-600">$0.00</div>
+        </div>
+        <i class="fas fa-coins text-green-500 text-2xl"></i>
+      </div>
+      <div class="card p-4 flex items-center justify-between">
+        <div>
+          <div class="text-sm text-gray-600 flex items-center gap-1">
+            <i class="fas fa-arrow-down text-red-500"></i>Total Expense
+          </div>
+          <div id="totalExpense" class="text-2xl font-bold text-red-600">$0.00</div>
+        </div>
+        <i class="fas fa-receipt text-red-500 text-2xl"></i>
+      </div>
+      <div class="card p-4 flex items-center justify-between">
+        <div>
+          <div class="text-sm text-gray-600 flex items-center gap-1">
+            <i class="fas fa-balance-scale text-blue-500"></i>Net Balance
+          </div>
+          <div id="netBalance" class="text-2xl font-bold text-blue-600">$0.00</div>
+        </div>
+        <i class="fas fa-scale-balanced text-blue-500 text-2xl"></i>
+      </div>
+    </div>
+
+    <!-- USER BALANCES -->
+    <section class="mb-8">
+      <h2 class="text-xl font-medium mb-4 flex items-center gap-2">
+        <i class="fas fa-users text-blue-500"></i>User Balances
+      </h2>
+      <div id="userBalances" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4"></div>
+    </section>
+
+    <!-- TRANSACTIONS TABLE -->
+    <section>
+      <h2 class="text-xl font-medium mb-4">Transactions</h2>
+      <div class="overflow-auto card">
+        <table class="w-full text-left border-collapse">
+          <thead class="bg-gray-50">
+            <tr>
+              <th class="p-3">Date</th><th class="p-3">Time</th><th class="p-3">Type</th>
+              <th class="p-3">Amount</th><th class="p-3">Category</th><th class="p-3">Notes</th>
+              <th class="p-3">People</th><th class="p-3">Each</th><th class="p-3">By</th>
+              <th class="p-3">Actions</th>
+            </tr>
+          </thead>
+          <tbody id="tableBody"></tbody>
+        </table>
+      </div>
+    </section>
+
+  </div><!-- /APP -->
+
   <!-- Firebase SDK -->
   <script src="https://www.gstatic.com/firebasejs/9.6.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.6.0/firebase-database-compat.js"></script>
-  <style>
-    body { 
-      font-family: 'Inter', sans-serif;
-      background-color: #f8fafc;
-    }
-    .card {
-      background: white;
-      border-radius: 12px;
-      box-shadow: 0 2px 8px rgba(0,0,0,0.05);
-      transition: all 0.2s ease;
-    }
-    .card:hover {
-      box-shadow: 0 4px 12px rgba(0,0,0,0.1);
-    }
-    .form-input {
-      border-radius: 8px;
-      border: 1px solid #e2e8f0;
-      transition: all 0.2s ease;
-    }
-    .form-input:focus {
-      border-color: #3b82f6;
-      box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
-    }
-    .btn-primary {
-      background-color: #3b82f6;
-      transition: all 0.2s ease;
-    }
-    .btn-primary:hover {
-      background-color: #2563eb;
-    }
-    .chip {
-      background-color: #f1f5f9;
-      color: #1e293b;
-      padding: 6px 12px;
-      border-radius: 20px;
-      display: inline-flex;
-      align-items: center;
-      font-size: 0.875rem;
-    }
-    .tab {
-      border-bottom: 3px solid transparent;
-      transition: all 0.2s ease;
-      font-weight: 500;
-    }
-    .tab.active {
-      border-color: #3b82f6;
-      color: #3b82f6;
-    }
-    .modal-overlay {
-      position: fixed;
-      inset: 0;
-      background: rgba(0,0,0,0.4);
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      z-index: 50;
-    }
-    .modal {
-      background: white;
-      padding: 2rem;
-      border-radius: 16px;
-      width: 90%;
-      max-width: 600px;
-      max-height: 90vh;
-      overflow-y: auto;
-      box-shadow: 0 10px 25px -5px rgba(0,0,0,0.1);
-    }
-    #alertBox {
-      position: fixed;
-      top: 50%;
-      left: 50%;
-      transform: translate(-50%, -50%);
-      padding: 1rem 2rem;
-      border-radius: 8px;
-      box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-      z-index: 100;
-      transition: all 0.3s ease;
-      display: flex;
-      align-items: center;
-      max-width: 90%;
-      text-align: center;
-    }
-    
-}
 
-  </style>
   <script>
-    // Firebase config & init
+    // ── Firebase config ──
     const firebaseConfig = {
       apiKey: "AIzaSyB-domZ-auX6gjlVd8PUtQNejIbnI6s4pU",
       authDomain: "babai-bd396.firebaseapp.com",
@@ -109,886 +247,237 @@
       measurementId: "G-ZCHCMW26LF"
     };
     firebase.initializeApp(firebaseConfig);
-    const database = firebase.database();
+    const db = firebase.database();
 
-    const users = { "6301":"Babai","2806":"Harsha","6969":"Nihal","0400":"Kiwi" };
-    const userList = ["Babai","Harsha","Nihal","Kiwi"];
-    let expenses = [], editIndex = -1, currentUser = null, currentView = "all", myRecordsOnly = false;
+    // ── State ──
+    const users = {"6301":"Babai","2806":"Harsha","6969":"Nihal","0400":"Kiwi"};
+    let currentUser = null, expenses = [], editIndex = -1;
 
-    function initApp(){
-      loadExpenses();
-      updateSessionByTime();
-      document.getElementById('date').valueAsDate = new Date();
-    }
+    // ── Login ──
     function validateLogin(){
-      const code = document.getElementById("loginCode").value;
-      if(users[code]){ 
-        currentUser=users[code]; 
-        localStorage.setItem("userLoggedIn",currentUser); 
-        showMainApp(currentUser); 
+      const code = document.getElementById("loginCode").value.trim();
+      if(users[code]){
+        currentUser = users[code];
+        localStorage.setItem("userLoggedIn", currentUser);
+        showMainApp();
+      } else {
+        alert("Invalid code");
       }
-      else showAlert("Invalid login code", 'error');
     }
-    function showMainApp(name){
+    function showMainApp(){
       document.getElementById("loginContainer").classList.add("hidden");
       document.getElementById("appContent").classList.remove("hidden");
-      document.getElementById("recordedBy").value = name;
-      document.getElementById("heading").innerText = `${name}'s Expense Tracker`;
-      showAlert(`Welcome back, ${name}!`, 'success');
+      document.getElementById("heading").innerText = `${currentUser}'s Tracker`;
       initApp();
     }
-    function logout(){ localStorage.removeItem("userLoggedIn"); location.reload(); }
-    function showAlert(msg, type='error'){
-      const b = document.getElementById("alertBox");
-      b.textContent = msg;
-      b.className = `fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 px-8 py-4 rounded-lg shadow-lg transition-all duration-300 ${
-        type==='error'?'bg-red-600':'bg-green-600'
-      } text-white opacity-100 flex items-center`;
-      
-      const icon = document.createElement('i');
-      icon.className = type === 'error' ? 'fas fa-exclamation-circle mr-3' : 'fas fa-check-circle mr-3';
-      b.prepend(icon);
-      
-      setTimeout(() => {
-        b.classList.add("opacity-0");
-        setTimeout(() => b.classList.add("hidden"), 300);
-      }, 3000);
+    function logout(){
+      localStorage.removeItem("userLoggedIn");
+      location.reload();
     }
-    function updateSessionByTime(){
-      const h=new Date().getHours(), s=document.getElementById("session");
-      s.value = h<12?"Morning":h<17?"Afternoon":"Evening";
+    document.addEventListener("DOMContentLoaded", ()=>{
+      const saved = localStorage.getItem("userLoggedIn");
+      if(saved){ currentUser = saved; showMainApp(); }
+      document.getElementById("loginCode")
+        .addEventListener("keydown", e=>{ if(e.key==="Enter") validateLogin(); });
+    });
+
+    // ── Shared UI ──
+    function togglePeopleMenu(){
+      document.getElementById("peopleMenu").classList.toggle("hidden");
+      document.getElementById("selectedChips").classList.add("hidden");
     }
-    // --- Replace your existing updateSelectedChips and toggleAllCheckboxes with these ---
-
-function updateSelectedChips() {
-  const container = document.getElementById("selectedChips");
-  container.innerHTML = "";
-  document.querySelectorAll(".personCheck:checked").forEach(cb => {
-    const chip = document.createElement("span");
-    chip.className = "px-2 py-1 bg-gray-100 rounded-full text-sm flex items-center";
-    chip.innerHTML = `<i class="fas fa-user mr-1 text-xs"></i>${cb.value}`;
-    container.appendChild(chip);
-  });
-  updateEachPays();
-}
-
-function toggleAllCheckboxes(master) {
-  document.querySelectorAll(".personCheck").forEach(cb => {
-    cb.checked = master.checked;
-  });
-  updateSelectedChips();
-}
-
-function updateEachPays(){
-       const amt = parseFloat(document.getElementById("amount").value) || 0;
-       const sel = document.querySelectorAll(".personCheck:checked");
-       const type = document.getElementById("type").value;
--      let each = amt / sel.length;
-+      let each = 0;
-       if(type === "Credit"){
-         each = amt;
-         document.getElementById("splitInfo").innerText = "Full amount to recorder";
-       } else if(sel.length){
-         each = amt / sel.length;
-         document.getElementById("splitInfo").innerText = `Split among ${sel.length} people`;
-       } else {
-         document.getElementById("splitInfo").innerText = "Select at least one person";
-       }
-       document.getElementById("eachPaysDisplay").innerText = each.toFixed(2);
-     }
-
-    function loadExpenses(){
-      database.ref('expenses').orderByChild('timestamp').on('value',snap=>{
-        const d=snap.val();
-        expenses = d?Object.entries(d).map(([id,v])=>({id,...v})):[]; 
-        expenses.sort((a,b)=>b.timestamp-a.timestamp);
-        renderExpenses(); updateTotals(); updateUserBalances();
+    function updateSelectedChips(){
+      const cont = document.getElementById("selectedChips");
+      cont.innerHTML = "";
+      document.querySelectorAll(".personCheck:checked").forEach(cb=>{
+        const s = document.createElement("span");
+        s.className="px-2 py-1 bg-gray-100 rounded-full text-sm flex items-center gap-1";
+        s.innerHTML = `<i class="fas fa-user text-xs"></i>${cb.value}`;
+        cont.appendChild(s);
       });
+      cont.classList[ cont.children.length ? "remove":"add" ]("hidden");
+      updateEachPays();
     }
-    function addEntry(e) {
-  e.preventDefault();
-
-  // grab all the inputs
-  const date        = document.getElementById('date').value;
-  const session     = document.getElementById('session').value;
-  const type        = document.getElementById('type').value;
-  const amount      = parseFloat(document.getElementById('amount').value);
-  const category    = document.getElementById('category').value;
-  const notes       = document.getElementById('notes').value;
-  const recordedBy  = document.getElementById('recordedBy').value;
-
-  // read the multi‑select
-  const people = Array.from(
-    document.getElementById('sharedWith').selectedOptions
-  ).map(opt => opt.value);
-
-  // basic validation
-  if (!date || isNaN(amount) || people.length === 0) {
-    showAlert("Please complete all required fields", 'error');
-    return;
-  }
-
-  // compute per‑person split
-  let eachPays;
-  if (type === 'Credit') {
-    eachPays = amount;
-  } else {
-    eachPays = amount / people.length;
-  }
-
-  // build payload
-  const entry = {
-    date,
-    session,
-    type,
-    amount,
-    category,
-    notes,
-    recordedBy,
-    people,
-    eachPays,
-    timestamp: firebase.database.ServerValue.TIMESTAMP
-  };
-
-  const ref = database.ref('expenses');
-
-  if (editIndex >= 0) {
-    // updating existing
-    const id = expenses[editIndex].id;
-    database.ref(`expenses/${id}`).update(entry)
-      .then(() => {
-        showAlert("Expense updated successfully", 'success');
-        editIndex = -1;
-        document.getElementById('submitBtn').innerHTML = '<i class="fas fa-plus mr-2"></i> Add Expense';
-        resetForm();
-      })
-      .catch(err => showAlert("Update failed: " + err.message, 'error'));
-  } else {
-    // new push
-    ref.push(entry)
-      .then(() => {
-        showAlert("Expense added successfully", 'success');
-        resetForm();
-      })
-      .catch(err => showAlert("Add failed: " + err.message, 'error'));
-  }
-}
-
-    function resetForm(){
-      document.querySelector('form').reset();
-      document.getElementById('selectedChips').innerHTML='';
-      document.getElementById('date').valueAsDate=new Date();
-      document.getElementById('eachPaysDisplay').textContent='0.00';
-      document.getElementById('splitInfo').textContent='Select at least one person';
-      updateSessionByTime();
-      editIndex=-1; 
-      document.getElementById('submitBtn').innerHTML='<i class="fas fa-plus mr-2"></i> Add Expense';
-    }
-    function editEntry(idx){
-      const e=expenses[idx];
-      ['date','session','type','amount','category','notes','recordedBy'].forEach(id=>document.getElementById(id).value=e[id]);
-      document.querySelectorAll('.personCheck').forEach(cb=>cb.checked=false);
-      e.people.forEach(p=>document.querySelector(`.personCheck[value="${p}"]`).checked=true);
+    function toggleAllCheckboxes(master){
+      document.querySelectorAll(".personCheck").forEach(cb=>cb.checked=master.checked);
       updateSelectedChips();
-      editIndex=idx; 
-      document.getElementById('submitBtn').innerHTML='<i class="fas fa-save mr-2"></i> Update Expense';
-      window.scrollTo({top:0,behavior:'smooth'});
     }
-    function deleteEntry(idx){
-      if(confirm('Are you sure you want to delete this expense?')){
-        const id=expenses[idx].id;
-        database.ref(`expenses/${id}`).remove()
-          .then(()=>showAlert("Expense deleted", 'success'))
-          .catch(err=>showAlert("Delete failed: " + err.message, 'error'));
+
+    // ── Split logic ──
+    function updateEachPays(){
+      const amt = parseFloat(document.getElementById("amount").value)||0;
+      const sel = document.querySelectorAll(".personCheck:checked").length;
+      const type= document.getElementById("type").value;
+      let each=0;
+      if(type==="Credit"){ each=amt; document.getElementById("splitInfo").innerText="Full to recorder"; }
+      else if(sel){ each=amt/sel; document.getElementById("splitInfo").innerText=`Split among ${sel}`; }
+      else document.getElementById("splitInfo").innerText="Select people";
+      document.getElementById("eachPaysDisplay").innerText=each.toFixed(2);
+    }
+
+    // ── Init & CRUD ──
+    function initApp(){
+      loadExpenses();
+      document.getElementById("date").valueAsDate=new Date();
+      document.getElementById("amount").addEventListener("input",updateEachPays);
+      document.getElementById("type").addEventListener("change",updateEachPays);
+    }
+    function addEntry(e){
+      e.preventDefault();
+      const entry={
+        date:document.getElementById("date").value,
+        session:document.getElementById("session").value,
+        type:document.getElementById("type").value,
+        amount:parseFloat(document.getElementById("amount").value)||0,
+        category:document.getElementById("category").value,
+        notes:document.getElementById("notes").value,
+        recordedBy:currentUser,
+        people:Array.from(document.querySelectorAll(".personCheck:checked")).map(cb=>cb.value),
+        eachPays:parseFloat(document.getElementById("eachPaysDisplay").innerText)||0,
+        timestamp:firebase.database.ServerValue.TIMESTAMP
+      };
+      if(!entry.date||!entry.people.length){
+        alert("Fill Date & Shared With"); return;
       }
+      db.ref("expenses").push(entry)
+        .then(()=>{ resetForm(); applyFilters(); })
+        .catch(err=>alert("Add failed:"+err.message));
     }
-    function changeView(view){
-      currentView=view;
-      document.querySelectorAll('.view-tab').forEach(t=>t.classList.remove('active'));
-      document.getElementById(`view-${view}`).classList.add('active');
-      renderExpenses();
+    function resetForm(){
+      document.querySelector("form").reset();
+      document.getElementById("selectedChips").classList.add("hidden");
+      document.getElementById("peopleMenu").classList.add("hidden");
+      document.getElementById("date").valueAsDate=new Date();
+      updateEachPays();
     }
-    function toggleMyRecords(){ 
-      myRecordsOnly=document.getElementById('myRecordsToggle').checked; 
-      renderExpenses(); 
+    function loadExpenses(){
+      db.ref("expenses").orderByChild("timestamp")
+        .on("value",snap=>{
+          expenses=[];
+          snap.forEach(c=>expenses.push({id:c.key,...c.val()}));
+          applyFilters();
+        });
     }
-    function renderExpenses(){
-      const tbody=document.getElementById('tableBody'); 
-      tbody.innerHTML='';
-      let filtered=[...expenses];
-      
-      // date range
-      const sd=document.getElementById('startDate').value, ed=document.getElementById('endDate').value;
+    function applyFilters(){
+      let list = [...expenses];
+      const view = document.getElementById("viewFilter").value;
+      const now=Date.now();
+      if(view==="weekly")   list=list.filter(e=>e.timestamp>now-7*24*3600*1000);
+      if(view==="monthly")  list=list.filter(e=>e.timestamp>now-30*24*3600*1000);
+      if(view==="mine")     list=list.filter(e=>e.recordedBy===currentUser);
+      const sd=document.getElementById("startDate").value;
+      const ed=document.getElementById("endDate").value;
       if(sd&&ed){
         const s=new Date(sd), e=new Date(ed);
-        filtered=filtered.filter(x=>{const d=new Date(x.date); return d>=s&&d<=e;});
-      } else {
-        if(currentView==='weekly'){ 
-          const oneWeek=new Date(Date.now()-7*24*3600*1000); 
-          filtered=filtered.filter(x=>new Date(x.date)>=oneWeek); 
-        }
-        if(currentView==='monthly'){ 
-          const om=new Date((new Date()).setMonth((new Date()).getMonth()-1)); 
-          filtered=filtered.filter(x=>new Date(x.date)>=om); 
-        }
-        if(currentView==='user') filtered=filtered.filter(x=>x.recordedBy===currentUser||x.people.includes(currentUser));
+        list=list.filter(x=>{
+          const d=new Date(x.date);
+          return d>=s&&d<=e;
+        });
       }
-      
-      if(myRecordsOnly) filtered=filtered.filter(x=>x.recordedBy===currentUser||x.people.includes(currentUser));
-      
-      if(!filtered.length){
-        tbody.innerHTML=`
-          <tr>
-            <td colspan="10" class="py-8 text-center text-gray-500">
-              <i class="fas fa-inbox text-3xl mb-3 opacity-30"></i>
-              <div class="text-lg">No expenses found</div>
-            </td>
-          </tr>`;
+      renderExpenses(list);
+      updateSummary(list);
+      updateUserBalances();
+    }
+    function renderExpenses(list){
+      const tb=document.getElementById("tableBody"); tb.innerHTML="";
+      if(!list.length){
+        tb.innerHTML=`<tr><td colspan=10 class="p-4 text-center text-gray-500">No expenses</td></tr>`;
         return;
       }
-      
-      filtered.forEach(exp=>{
-        const tr=document.createElement('tr'); 
-        tr.className='border-b hover:bg-gray-50 transition-colors';
-        
-        const peopleList=exp.people.map(p=>`
-          <span class="inline-flex items-center bg-gray-100 px-3 py-1 rounded-full text-xs mr-1 mb-1">
-            <i class="fas fa-user mr-1 text-xs opacity-70"></i>${p}
-          </span>`).join('');
-        
+      list.forEach(e=>{
+        const tr=document.createElement("tr"); tr.className="border-b hover:bg-gray-50";
         tr.innerHTML=`
-          <td class="py-4 px-4 whitespace-nowrap text-sm text-gray-800">${formatDateShort(exp.date)}</td>
-          <td class="px-4 text-sm text-gray-600">${exp.session.charAt(0)}</td>
-          <td class="px-4 ${exp.type==='Credit'?'text-green-600':'text-red-600'} text-sm">
-            <i class="fas ${exp.type==='Credit'?'fa-arrow-up':'fa-arrow-down'}"></i>
-          </td>
-          <td class="px-4 font-medium text-sm">$${exp.amount.toFixed(2)}</td>
-          <td class="px-4 text-sm">
-            <span class="inline-flex items-center">
-              ${getCategoryIcon(exp.category)} ${exp.category||'Uncategorized'}
-            </span>
-          </td>
-          <td class="px-4 text-sm text-gray-600 truncate max-w-xs">${exp.notes||'-'}</td>
-          <td class="px-4 text-sm">
-            <div class="flex flex-wrap">${peopleList}</div>
-          </td>
-          <td class="px-4 text-sm font-medium">$${exp.eachPays.toFixed(2)}</td>
-          <td class="px-4 text-sm">
-            <span class="inline-flex items-center">
-              <i class="fas fa-user-edit mr-1 text-xs opacity-70"></i>${exp.recordedBy}
-            </span>
-          </td>
-          <td class="px-4 whitespace-nowrap text-sm">
-            <button onclick="editEntry(${expenses.findIndex(e=>e.id===exp.id)})" 
-                    class="text-blue-600 hover:text-blue-800 mr-2 p-2 rounded-lg hover:bg-blue-50 transition-colors">
-              <i class="fas fa-edit"></i>
-            </button>
-            <button onclick="deleteEntry(${expenses.findIndex(e=>e.id===exp.id)})" 
-                    class="text-red-600 hover:text-red-800 p-2 rounded-lg hover:bg-red-50 transition-colors">
-              <i class="fas fa-trash"></i>
-            </button>
+          <td class="p-2">${e.date}</td>
+          <td class="p-2">${e.session.charAt(0)}</td>
+          <td class="p-2 ${e.type==='Credit'?'text-green-600':'text-red-600'}">${e.type.charAt(0)}</td>
+          <td class="p-2">$${e.amount.toFixed(2)}</td>
+          <td class="p-2">${e.category||"-"}</td>
+          <td class="p-2">${e.notes||"-"}</td>
+          <td class="p-2">${e.people.join(", ")}</td>
+          <td class="p-2">$${e.eachPays.toFixed(2)}</td>
+          <td class="p-2">${e.recordedBy}</td>
+          <td class="p-2 space-x-2">
+            <button onclick="startEdit('${e.id}')" class="text-blue-600"><i class="fas fa-edit"></i></button>
+            <button onclick="deleteEntry('${e.id}')" class="text-red-600"><i class="fas fa-trash"></i></button>
           </td>`;
-        tbody.appendChild(tr);
+        tb.appendChild(tr);
       });
     }
-    
-    function getCategoryIcon(category) {
-      if (!category) return '<i class="fas fa-tag mr-2 text-gray-400"></i>';
-      const icons = {
-        'Food': 'fa-utensils text-orange-500',
-        'Rent': 'fa-home text-blue-500',
-        'Transport': 'fa-bus text-green-500',
-        'Shopping': 'fa-shopping-bag text-purple-500',
-        'Entertainment': 'fa-film text-pink-500',
-        'Utilities': 'fa-bolt text-yellow-500',
-        'Travel': 'fa-plane text-indigo-500',
-        'Health': 'fa-heartbeat text-red-500'
-      };
-      const defaultIcon = 'fa-tag text-gray-400';
-      const iconClass = icons[category] || defaultIcon;
-      return `<i class="fas ${iconClass} mr-2"></i>`;
+    function updateSummary(list){
+      let inc=0,exp=0;
+      list.forEach(e=> e.type==="Credit"?inc+=e.amount:exp+=e.amount);
+      document.getElementById("totalIncome").innerText=inc.toFixed(2);
+      document.getElementById("totalExpense").innerText=exp.toFixed(2);
+      document.getElementById("netBalance").innerText=(inc-exp).toFixed(2);
     }
-    
-    function formatDateShort(d){ 
-      const dt=new Date(d); 
-      return `${dt.getDate()}/${dt.getMonth()+1}`; 
-    }
-    
-    function updateTotals(){
-      let inc=0, expT=0; 
-      expenses.forEach(e=>e.type==='Credit'?inc+=e.amount:expT+=e.amount);
-      document.getElementById('totalIncome').textContent=inc.toFixed(2);
-      document.getElementById('totalExpense').textContent=expT.toFixed(2);
-      document.getElementById('netBalance').textContent=(inc-expT).toFixed(2);
-    }
-    
     function updateUserBalances(){
-      const bal={}; userList.forEach(u=>bal[u]=0);
+      const bal={"Babai":0,"Harsha":0,"Nihal":0,"Kiwi":0};
       expenses.forEach(e=>{
-        if(e.type==='Credit') bal[e.recordedBy]+=e.amount;
-        else{ 
-          const each=e.amount/e.people.length; 
-          e.people.forEach(p=>bal[p]-=each); 
-          bal[e.recordedBy]+=e.amount; 
+        if(e.type==="Credit") bal[e.recordedBy]+=e.amount;
+        else{
+          const each=e.amount/e.people.length;
+          e.people.forEach(p=>bal[p]-=each);
+          bal[e.recordedBy]+=e.amount;
         }
       });
-      
-      const c=document.getElementById('userBalances'); 
-      c.innerHTML='';
-      
-      userList.forEach(u=>{
-        const b=bal[u], div=document.createElement('div');
-        div.className=`card p-5 text-center ${
-          b>0?'border-green-200 bg-green-50 text-green-700':
-          b<0?'border-red-200 bg-red-50 text-red-700':
-          'border-gray-200 bg-gray-50 text-gray-700'
-        } border`;
-        
-        div.innerHTML=`
-          <div class="text-sm mb-2 flex items-center justify-center">
-            <i class="fas fa-user-circle mr-2 ${b>0?'text-green-600':b<0?'text-red-600':'text-gray-500'}"></i>${u}
-          </div>
-          <div class="text-2xl font-bold mb-2">$${Math.abs(b).toFixed(2)}</div>
-          <div class="text-xs ${
-            b>0?'text-green-600':b<0?'text-red-600':'text-gray-500'
-          }">
-            <i class="fas ${
-              b>0?'fa-arrow-up':b<0?'fa-arrow-down':'fa-check'
-            } mr-1"></i>
-            ${b>0?'Gets back':b<0?'Owes':'Settled'}
-          </div>`;
-        c.appendChild(div);
+      const c=document.getElementById("userBalances"); c.innerHTML="";
+      Object.entries(bal).forEach(([u,a])=>{
+        const d=document.createElement("div");
+        d.className="balance-card "+(a>=0?"positive":"negative");
+        d.innerHTML=`<div class="font-medium">${u}</div>
+                    <div class="text-2xl font-bold">$${Math.abs(a).toFixed(2)}</div>
+                    <div class="mt-1 text-sm">${a>=0?"Gets back":"Owes"}</div>`;
+        c.appendChild(d);
       });
     }
-    
-    function exportCSV(){
-      const header=["Date","Session","Type","Amount","Category","Notes","People","EachPays","RecordedBy"];
-      const rows=expenses.map(e=>[
-        e.date,e.session,e.type,
-        e.amount.toFixed(2),e.category,
-        `"${e.notes||''}"`,
-        `"${e.people.join(',')}"`,
-        e.eachPays.toFixed(2),e.recordedBy
-      ]);
-      let csv=[header,...rows].map(r=>r.join(",")).join("\r\n");
-      const blob=new Blob([csv],{type:'text/csv'}), url=URL.createObjectURL(blob);
-      const a=document.createElement('a'); a.href=url; a.download='expenses.csv';
-      document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    function deleteEntry(id){
+      db.ref(`expenses/${id}`).remove()
+        .then(()=>applyFilters());
     }
-    
-    function showAnalytics(){
-      const byCat={}, userBal={}; userList.forEach(u=>userBal[u]=0);
-      expenses.forEach(e=>{
-        byCat[e.category]=(byCat[e.category]||0)+e.amount;
-        e.people.forEach(p=>userBal[p]-=e.eachPays);
-        userBal[e.recordedBy]+=e.amount;
-      });
-      
-      const top5=[...expenses].sort((a,b)=>b.amount-a.amount).slice(0,5);
-      const overlay=document.createElement('div'); overlay.className='modal-overlay';
-      const modal=document.createElement('div'); modal.className='modal';
-      
-      modal.innerHTML=`
-        <div class="flex justify-between items-center mb-6">
-          <h2 class="text-xl font-bold text-gray-800">
-            <i class="fas fa-chart-pie mr-2 text-blue-500"></i>Expense Analytics
-          </h2>
-          <button onclick="document.body.removeChild(this.closest('.modal-overlay'))" 
-                  class="text-gray-500 hover:text-gray-700">
-            <i class="fas fa-times"></i>
-          </button>
-        </div>
-        
-        <div class="grid gap-6">
-          <div class="card p-5">
-            <h3 class="font-semibold mb-4 flex items-center text-gray-700">
-              <i class="fas fa-tags mr-2 text-blue-500"></i>By Category
-            </h3>
-            <div class="space-y-3">${
-              Object.entries(byCat)
-                .sort((a,b)=>b[1]-a[1])
-                .map(([c,t])=>`
-                  <div class="flex items-center justify-between">
-                    <span class="flex items-center text-gray-700">
-                      ${getCategoryIcon(c)} ${c||'Uncategorized'}
-                    </span>
-                    <span class="font-medium">$${t.toFixed(2)}</span>
-                  </div>`)
-                .join('')
-            }</div>
-          </div>
-          
-          <div class="card p-5">
-            <h3 class="font-semibold mb-4 flex items-center text-gray-700">
-              <i class="fas fa-users mr-2 text-blue-500"></i>User Balances
-            </h3>
-            <div class="space-y-3">${
-              Object.entries(userBal)
-                .map(([u,t])=>`
-                  <div class="flex items-center justify-between">
-                    <span class="flex items-center text-gray-700">
-                      <i class="fas fa-user-circle mr-2 ${
-                        t>=0?'text-green-500':'text-red-500'
-                      }"></i>${u}
-                    </span>
-                    <span class="font-medium ${
-                      t>=0?'text-green-600':'text-red-600'
-                    }">
-                      ${t>=0?'+':''}$${Math.abs(t).toFixed(2)}
-                    </span>
-                  </div>`)
-                .join('')
-            }</div>
-          </div>
-          
-          <div class="card p-5">
-            <h3 class="font-semibold mb-4 flex items-center text-gray-700">
-              <i class="fas fa-star mr-2 text-blue-500"></i>Top 5 Expenses
-            </h3>
-            <table class="w-full text-sm">
-              <thead>
-                <tr class="text-left border-b">
-                  <th class="pb-2 text-gray-700">Date</th>
-                  <th class="pb-2 text-gray-700">Category</th>
-                  <th class="pb-2 text-gray-700">Amount</th>
-                </tr>
-              </thead>
-              <tbody>${
-                top5.map(e=>`
-                  <tr class="border-b">
-                    <td class="py-3 text-gray-600">${e.date}</td>
-                    <td class="py-3 text-gray-600">${e.category||'-'}</td>
-                    <td class="py-3 font-medium">$${e.amount.toFixed(2)}</td>
-                  </tr>`).join('')
-              }</tbody>
-            </table>
-          </div>
-        </div>
-        
-        <div class="mt-6 text-right">
-          <button onclick="document.body.removeChild(this.closest('.modal-overlay'))" 
-                  class="px-4 py-2 bg-gray-100 hover:bg-gray-200 rounded-lg text-gray-700 transition-colors">
-            Close
-          </button>
-        </div>`;
-      
-      overlay.appendChild(modal); 
-      document.body.appendChild(overlay);
-    }
-
-    document.addEventListener("DOMContentLoaded",()=>{
-      const u=localStorage.getItem("userLoggedIn");
-      if(u) showMainApp(u);
-      document.getElementById('amount').addEventListener('input',updateEachPays);
-      document.getElementById('type').addEventListener('change',updateEachPays);
-      document.querySelectorAll('.view-tab').forEach(t=>
-        t.addEventListener('click',()=>changeView(t.id.replace('view-','')))
+    function startEdit(id){
+      const e = expenses.find(x=>x.id===id);
+      if(!e) return;
+      editIndex=id;
+      ["date","session","type","amount","category","notes"].forEach(f=>
+        document.getElementById(f).value=e[f]
       );
-      
-      // Close dropdown when clicking outside
-      document.addEventListener('click', (e) => {
-        if (!e.target.closest('#peopleMenu') && !e.target.closest('[onclick*="peopleMenu"]')) {
-          document.getElementById('peopleMenu').classList.add('hidden');
-        }
+      document.querySelectorAll(".personCheck").forEach(cb=>cb.checked=false);
+      e.people.forEach(p=>{
+        const cb=[...document.querySelectorAll(".personCheck")].find(x=>x.value===p);
+        if(cb) cb.checked=true;
       });
-    });
+      updateSelectedChips();
+      document.querySelector("button[type=submit]").innerText="Save";
+    }
+    function exportCSV(){
+      const rows = expenses.map(e=>[
+        e.date, e.session, e.type,
+        e.amount.toFixed(2), e.category, e.notes,
+        e.people.join(';'), e.eachPays.toFixed(2), e.recordedBy
+      ]);
+      let csv=[["Date","Session","Type","Amount","Category","Notes","People","Each","By"],...rows]
+        .map(r=>r.map(v=>`"${v}"`).join(',')).join('\r\n');
+      let blob=new Blob([csv],{type:"text/csv"}),url=URL.createObjectURL(blob);
+      let a=document.createElement("a");a.href=url;a.download="expenses.csv";
+      document.body.appendChild(a);a.click();document.body.removeChild(a);
+    }
+    function showAnalytics(){
+      let byCat={};
+      expenses.forEach(e=> byCat[e.category]=(byCat[e.category]||0)+e.amount );
+      const modal=`<div class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center">
+        <div class="bg-white p-6 rounded-lg max-w-md w-full">
+          <h3 class="text-lg font-semibold mb-4">Analytics by Category</h3>
+          ${Object.entries(byCat).map(([c,v])=>`
+            <div class="flex justify-between"><span>${c||"Uncategorized"}</span><span>$${v.toFixed(2)}</span></div>
+          `).join('')}
+          <div class="text-right mt-4">
+            <button onclick="document.body.removeChild(this.closest('div'))"
+                    class="px-4 py-2 bg-gray-200 rounded">Close</button>
+          </div>
+        </div>
+      </div>`;
+      document.body.insertAdjacentHTML('beforeend', modal);
+    }
   </script>
-</head>
-<body>
-  <!-- Login Screen -->
-  <div id="loginContainer" class="flex items-center justify-center min-h-screen bg-gray-50">
-    <div class="w-full max-w-md mx-4 p-8 bg-white rounded-xl shadow-sm border border-gray-200">
-      <div class="text-center mb-8">
-        <div class="w-20 h-20 bg-blue-50 rounded-full flex items-center justify-center mx-auto mb-4">
-          <i class="fas fa-wallet text-blue-500 text-3xl"></i>
-        </div>
-        <h2 class="text-3xl font-bold text-gray-800 mb-2">Expense Tracker</h2>
-        <p class="text-gray-600">Track and manage shared expenses</p>
-      </div>
-      <div class="mb-6">
-        <div class="relative">
-          <input id="loginCode" type="password" maxlength="4" placeholder="Enter your 4-digit code"
-                 class="w-full px-5 py-3 form-input text-center text-lg focus:ring-2 focus:ring-blue-500"
-                 onkeypress="if(event.key==='Enter') validateLogin()" />
-          <div class="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
-            <i class="fas fa-lock text-gray-400"></i>
-          </div>
-        </div>
-      </div>
-      <button onclick="validateLogin()" 
-              class="w-full btn-primary text-white py-3 rounded-lg font-medium hover:shadow-md transition-all">
-        <i class="fas fa-sign-in-alt mr-2"></i> Login
-      </button>
-    </div>
-  </div>
-
-  <!-- Main App Content -->
-  <div id="appContent" class="hidden px-4 max-w-7xl mx-auto pb-10">
-    <div id="alertBox" class="hidden"></div>
-    
-    <!-- Header -->
-    <header class="py-8">
-      <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <div>
-          <h1 id="heading" class="text-2xl font-bold text-gray-800 flex items-center">
-            <i class="fas fa-wallet mr-3 text-blue-500"></i>Group Expense Tracker
-          </h1>
-          <p class="text-gray-600 text-sm mt-1">Track and split expenses with your group</p>
-        </div>
-        <button onclick="logout()" 
-                class="flex items-center bg-gray-800 text-white px-5 py-2.5 rounded-lg hover:bg-gray-900 transition-colors">
-          <i class="fas fa-sign-out-alt mr-2"></i>Logout
-        </button>
-      </div>
-    </header>
-
-    <!-- Main Content -->
-    <main class="max-w-6xl mx-auto">
-<section class="mb-8">
-  <div class="card p-6">
-    <h2 class="text-xl font-semibold text-gray-800 mb-6 flex items-center">
-      <i class="fas fa-plus-circle mr-3 text-blue-500"></i>Add New Expense
-    </h2>
-
-    <form class="space-y-5" onsubmit="addEntry(event)">
-      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-
-        <!-- Date -->
-        <div class="form-field">
-          <label for="date" class="flex items-center text-gray-700 mb-1.5">
-            <i class="fas fa-calendar mr-2 text-gray-500"></i>Date
-          </label>
-          <input type="date" id="date" class="w-full form-input px-4 py-2.5" required />
-        </div>
-
-        <!-- Time of Day -->
-        <div class="form-field">
-          <label for="session" class="flex items-center text-gray-700 mb-1.5">
-            <i class="fas fa-clock mr-2 text-gray-500"></i>Time of Day
-          </label>
-          <select id="session" class="w-full form-input px-4 py-2.5">
-            <option>Morning</option>
-            <option>Afternoon</option>
-            <option>Evening</option>
-          </select>
-        </div>
-
-        <!-- Transaction Type -->
-        <div class="form-field">
-          <label for="type" class="flex items-center text-gray-700 mb-1.5">
-            <i class="fas fa-exchange-alt mr-2 text-gray-500"></i>Transaction Type
-          </label>
-          <select id="type" class="w-full form-input px-4 py-2.5">
-            <option>Credit</option>
-            <option>Debit</option>
-          </select>
-        </div>
-
-        <!-- Amount -->
-        <div class="form-field">
-          <label for="amount" class="flex items-center text-gray-700 mb-1.5">
-            <i class="fas fa-dollar-sign mr-2 text-gray-500"></i>Amount ($)
-          </label>
-          <input type="number" id="amount" placeholder="0.00" step="0.01"
-                 class="w-full form-input px-4 py-2.5" required />
-        </div>
-
-        <!-- Category -->
-        <div class="form-field">
-          <label for="category" class="flex items-center text-gray-700 mb-1.5">
-            <i class="fas fa-tag mr-2 text-gray-500"></i>Category
-          </label>
-          <input type="text" id="category" placeholder="Select or enter category"
-                 class="w-full form-input px-4 py-2.5" list="categories" />
-          <datalist id="categories">
-            <option>Food</option>
-            <option>Rent</option>
-            <option>Transport</option>
-            <option>Shopping</option>
-            <option>Entertainment</option>
-            <option>Utilities</option>
-            <option>Travel</option>
-            <option>Health</option>
-          </datalist>
-        </div>
-
-        <!-- Split Amount (display only) -->
-        <div class="form-field">
-          <label class="flex items-center text-gray-700 mb-1.5">
-            <i class="fas fa-user-friends mr-2 text-gray-500"></i>Split Amount
-          </label>
-          <div class="w-full form-input px-4 py-2.5 bg-gray-50 rounded-lg flex items-center">
-            <span class="font-medium">$<span id="eachPaysDisplay">0.00</span></span>
-            <span id="splitInfo" class="text-xs text-gray-500 ml-2 block">Select at least one person</span>
-          </div>
-        </div>
-      </div>
-
-      <div class="grid grid-cols-1 md:grid-cols-2 gap-5 mt-4">
-
-        <!-- Recorded By -->
-        <div class="form-field">
-          <label for="recordedBy" class="flex items-center text-gray-700 mb-1.5">
-            <i class="fas fa-user-edit mr-2 text-gray-500"></i>Recorded By
-          </label>
-          <select id="recordedBy" class="w-full form-input px-4 py-2.5">
-            <option>Babai</option>
-            <option>Harsha</option>
-            <option>Nihal</option>
-            <option>Kiwi</option>
-          </select>
-        </div>
-
-        <!-- Shared With -->
-<div class="form-field relative">
-  <label class="flex items-center mb-1.5 text-gray-700">
-    <i class="fas fa-users mr-2 text-gray-500"></i>Shared With
-  </label>
-  <button
-    type="button"
-    onclick="document.getElementById('peopleMenu').classList.toggle('hidden')"
-    class="w-full form-input px-4 py-2.5 text-left flex justify-between items-center"
-  >
-    <span>Select people</span>
-    <i class="fas fa-chevron-down text-gray-500"></i>
-  </button>
-
-  <div
-    id="peopleMenu"
-    class="absolute hidden mt-1 bg-white w-full border rounded-lg shadow p-2 z-10"
-  >
-    <label class="flex items-center p-2 hover:bg-gray-100 cursor-pointer">
-      <input
-        type="checkbox"
-        class="personCheck mr-2"
-        value="Babai"
-        onchange="updateSelectedChips()"
-      />Babai
-    </label>
-    <label class="flex items-center p-2 hover:bg-gray-100 cursor-pointer">
-      <input
-        type="checkbox"
-        class="personCheck mr-2"
-        value="Harsha"
-        onchange="updateSelectedChips()"
-      />Harsha
-    </label>
-    <label class="flex items-center p-2 hover:bg-gray-100 cursor-pointer">
-      <input
-        type="checkbox"
-        class="personCheck mr-2"
-        value="Nihal"
-        onchange="updateSelectedChips()"
-      />Nihal
-    </label>
-    <label class="flex items-center p-2 hover:bg-gray-100 cursor-pointer">
-      <input
-        type="checkbox"
-        class="personCheck mr-2"
-        value="Kiwi"
-        onchange="updateSelectedChips()"
-      />Kiwi
-    </label>
-    <hr class="my-2"/>
-    <label class="flex items-center p-2 hover:bg-gray-100 cursor-pointer">
-      <input
-        type="checkbox"
-        class="mr-2"
-        onclick="toggleAllCheckboxes(this)"
-      />Select All
-    </label>
-  </div>
-
-  <div id="selectedChips" class="mt-2 flex flex-wrap gap-2"></div>
-</div>
-
-
-
-      <!-- Notes -->
-      <div class="form-field mt-4">
-        <label for="notes" class="flex items-center text-gray-700 mb-1.5">
-          <i class="fas fa-sticky-note mr-2 text-gray-500"></i>Notes
-        </label>
-        <input type="text" id="notes" placeholder="Add any additional details"
-               class="w-full form-input px-4 py-2.5" />
-      </div>
-
-      <!-- Actions -->
-      -    <!-- Actions -->
--    <div class="flex flex-col sm:flex-row gap-3">
--      <button type="submit" id="submitBtn"
--              class="btn-primary text-white py-2.5 px-5 rounded-lg flex-1 flex items-center justify-center">
--        <i class="fas fa-plus mr-2"></i>Add Expense
--      </button>
--      <button type="button" onclick="resetForm()"
--              class="bg-gray-100 text-gray-700 py-2.5 px-5 rounded-lg border">
--        <i class="fas fa-times mr-2"></i>Clear Form
--      </button>
--    </div>
-+    <!-- Actions -->
-+    <div class="flex justify-end items-center gap-3">
-+      <button type="submit" id="submitBtn"
-+              class="btn-primary text-white py-2.5 px-6 rounded-lg inline-flex items-center">
-+        <i class="fas fa-plus mr-2"></i>Add Expense
-+      </button>
-+      <button type="button" onclick="resetForm()"
-+              class="bg-gray-100 text-gray-700 py-2.5 px-6 rounded-lg border inline-flex items-center">
-+        <i class="fas fa-times mr-2"></i>Clear Form
-+      </button>
-+    </div>
-
-    </form>
-  </div>
-</section>
-
-
-      <!-- Filters Section -->
-     <section class="mb-6">
-  <div class="card p-5 flex flex-wrap items-center gap-4">
-    <!-- View Dropdown -->
-    <div class="w-full md:w-auto">
-      <label for="viewDropdown" class="sr-only">View</label>
-      <select id="viewDropdown" onchange="changeView(this.value)"
-              class="form-input px-4 py-2.5 rounded-lg border-gray-200 text-gray-700">
-        <option value="all">All</option>
-        <option value="weekly">Weekly</option>
-        <option value="monthly">Monthly</option>
-        <option value="user">Mine</option>
-      </select>
-    </div>
-
-    <!-- Date Range -->
-    <div class="flex items-center gap-2 w-full md:w-auto">
-      <i class="fas fa-calendar-alt text-gray-500"></i>
-      <input type="date" id="startDate" class="form-input text-sm p-1" onchange="renderExpenses()" />
-      <span class="text-gray-400">to</span>
-      <input type="date" id="endDate" class="form-input text-sm p-1" onchange="renderExpenses()" />
-    </div>
-
-    <!-- My Records Toggle -->
-    <label class="flex items-center gap-2 w-full md:w-auto">
-      <input type="checkbox" id="myRecordsToggle" class="h-4 w-4" onchange="toggleMyRecords()" />
-      <i class="fas fa-filter text-gray-500"></i>
-      <span class="text-gray-700 text-sm">My Records</span>
-    </label>
-
-    <!-- Push Actions to the right on desktop -->
-    <div class="flex items-center gap-2 w-full md:ml-auto md:w-auto">
-      <button onclick="showAnalytics()"
-              class="flex items-center text-sm text-blue-600 border border-blue-200 px-3 py-1 rounded-lg hover:bg-blue-50">
-        <i class="fas fa-chart-pie mr-1"></i>Analytics
-      </button>
-      <button onclick="exportCSV()"
-              class="flex items-center text-sm text-gray-700 border border-gray-200 px-3 py-1 rounded-lg hover:bg-gray-50">
-        <i class="fas fa-file-export mr-1"></i>Export
-      </button>
-    </div>
-  </div>
-</section>
-
-
-
-      <!-- Summary Cards -->
-      <section class="mb-6">
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-5">
-          <!-- Total Income -->
-          <div class="card p-5">
-            <div class="flex items-center justify-between">
-              <div>
-                <div class="text-sm text-gray-600 mb-1 flex items-center">
-                  <i class="fas fa-arrow-up mr-2 text-green-500"></i>Total Income
-                </div>
-                <div class="text-2xl font-bold text-green-600">$<span id="totalIncome">0.00</span></div>
-              </div>
-              <div class="bg-green-50 p-3 rounded-full">
-                <i class="fas fa-coins text-green-500 text-xl"></i>
-              </div>
-            </div>
-          </div>
-          
-          <!-- Total Expense -->
-          <div class="card p-5">
-            <div class="flex items-center justify-between">
-              <div>
-                <div class="text-sm text-gray-600 mb-1 flex items-center">
-                  <i class="fas fa-arrow-down mr-2 text-red-500"></i>Total Expense
-                </div>
-                <div class="text-2xl font-bold text-red-500">$<span id="totalExpense">0.00</span></div>
-              </div>
-              <div class="bg-red-50 p-3 rounded-full">
-                <i class="fas fa-receipt text-red-500 text-xl"></i>
-              </div>
-            </div>
-          </div>
-          
-          <!-- Net Balance -->
-          <div class="card p-5">
-            <div class="flex items-center justify-between">
-              <div>
-                <div class="text-sm text-gray-600 mb-1 flex items-center">
-                  <i class="fas fa-balance-scale mr-2 text-blue-500"></i>Net Balance
-                </div>
-                <div class="text-2xl font-bold text-blue-500">$<span id="netBalance">0.00</span></div>
-              </div>
-              <div class="bg-blue-50 p-3 rounded-full">
-                <i class="fas fa-scale-balanced text-blue-500 text-xl"></i>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <!-- User Balances -->
-      <section class="mb-8">
-        <h3 class="text-lg font-semibold text-gray-800 mb-4 flex items-center">
-          <i class="fas fa-users mr-2 text-blue-500"></i>User Balances
-        </h3>
-        <div id="userBalances" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5"></div>
-      </section>
-
-      <!-- Expenses Table -->
-      <section>
-        <div class="card overflow-x-auto">
-          <table class="w-full">
-            <thead>
-              <tr class="text-left border-b bg-gray-50">
-                <th class="p-4 text-sm font-semibold text-gray-700 whitespace-nowrap">
-                  <i class="fas fa-calendar mr-2"></i>Date
-                </th>
-                <th class="p-4 text-sm font-semibold text-gray-700 whitespace-nowrap">
-                  <i class="fas fa-clock mr-2"></i>Time
-                </th>
-                <th class="p-4 text-sm font-semibold text-gray-700 whitespace-nowrap">
-                  <i class="fas fa-exchange-alt mr-2"></i>Type
-                </th>
-                <th class="p-4 text-sm font-semibold text-gray-700 whitespace-nowrap">
-                  <i class="fas fa-dollar-sign mr-2"></i>Amount
-                </th>
-                <th class="p-4 text-sm font-semibold text-gray-700 whitespace-nowrap">
-                  <i class="fas fa-tag mr-2"></i>Category
-                </th>
-                <th class="p-4 text-sm font-semibold text-gray-700 whitespace-nowrap">
-                  <i class="fas fa-note mr-2"></i>Notes
-                </th>
-                <th class="p-4 text-sm font-semibold text-gray-700 whitespace-nowrap">
-                  <i class="fas fa-user-friends mr-2"></i>People
-                </th>
-                <th class="p-4 text-sm font-semibold text-gray-700 whitespace-nowrap">
-                  <i class="fas fa-user mr-2"></i>Each
-                </th>
-                <th class="p-4 text-sm font-semibold text-gray-700 whitespace-nowrap">
-                  <i class="fas fa-user-edit mr-2"></i>By
-                </th>
-                <th class="p-4 text-sm font-semibold text-gray-700 whitespace-nowrap">
-                  <i class="fas fa-cog mr-2"></i>Actions
-                </th>
-              </tr>
-            </thead>
-            <tbody id="tableBody"></tbody>
-          </table>
-        </div>
-      </section>
-    </main>
-  </div>
 </body>
 </html>
