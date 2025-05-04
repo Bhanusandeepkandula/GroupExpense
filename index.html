@@ -158,21 +158,27 @@
       const h=new Date().getHours(), s=document.getElementById("session");
       s.value = h<12?"Morning":h<17?"Afternoon":"Evening";
     }
-    function updateSelectedChips(){
-      const c=document.getElementById("selectedChips");
-      c.innerHTML='';
-      document.querySelectorAll('.personCheck:checked').forEach(cb=>{
-        const chip=document.createElement('span');
-        chip.className='chip flex items-center mr-2 mb-2'; 
-        chip.innerHTML = `<i class="fas fa-user mr-2 text-xs opacity-70"></i>${cb.value}`;
-        c.appendChild(chip);
-      });
-      updateEachPays();
-    }
-    function toggleAllCheckboxes(src){
-      document.querySelectorAll('.personCheck').forEach(cb=>cb.checked=src.checked);
-      updateSelectedChips();
-    }
+    // --- Replace your existing updateSelectedChips and toggleAllCheckboxes with these ---
+
+function updateSelectedChips() {
+  const container = document.getElementById("selectedChips");
+  container.innerHTML = "";
+  document.querySelectorAll(".personCheck:checked").forEach(cb => {
+    const chip = document.createElement("span");
+    chip.className = "px-2 py-1 bg-gray-100 rounded-full text-sm flex items-center";
+    chip.innerHTML = `<i class="fas fa-user mr-1 text-xs"></i>${cb.value}`;
+    container.appendChild(chip);
+  });
+  updateEachPays();
+}
+
+function toggleAllCheckboxes(master) {
+  document.querySelectorAll(".personCheck").forEach(cb => {
+    cb.checked = master.checked;
+  });
+  updateSelectedChips();
+}
+
     function updateEachPays(){
   const amount = parseFloat(document.getElementById('amount').value);
   const selected = Array.from(
@@ -739,18 +745,68 @@
         </div>
 
         <!-- Shared With -->
-<div class="form-field">
-  <label for="sharedWith" class="flex items-center mb-1.5 text-gray-700">
+<div class="form-field relative">
+  <label class="flex items-center mb-1.5 text-gray-700">
     <i class="fas fa-users mr-2 text-gray-500"></i>Shared With
   </label>
-  <select id="sharedWith" multiple
-        class="w-full form-input px-4 py-2.5 h-28 overflow-auto"
-        onchange="updateEachPays()">
-  <option>Babai</option>
-  <option>Harsha</option>
-  <option>Nihal</option>
-  <option>Kiwi</option>
-</select>
+  <button
+    type="button"
+    onclick="document.getElementById('peopleMenu').classList.toggle('hidden')"
+    class="w-full form-input px-4 py-2.5 text-left flex justify-between items-center"
+  >
+    <span>Select people</span>
+    <i class="fas fa-chevron-down text-gray-500"></i>
+  </button>
+
+  <div
+    id="peopleMenu"
+    class="absolute hidden mt-1 bg-white w-full border rounded-lg shadow p-2 z-10"
+  >
+    <label class="flex items-center p-2 hover:bg-gray-100 cursor-pointer">
+      <input
+        type="checkbox"
+        class="personCheck mr-2"
+        value="Babai"
+        onchange="updateSelectedChips()"
+      />Babai
+    </label>
+    <label class="flex items-center p-2 hover:bg-gray-100 cursor-pointer">
+      <input
+        type="checkbox"
+        class="personCheck mr-2"
+        value="Harsha"
+        onchange="updateSelectedChips()"
+      />Harsha
+    </label>
+    <label class="flex items-center p-2 hover:bg-gray-100 cursor-pointer">
+      <input
+        type="checkbox"
+        class="personCheck mr-2"
+        value="Nihal"
+        onchange="updateSelectedChips()"
+      />Nihal
+    </label>
+    <label class="flex items-center p-2 hover:bg-gray-100 cursor-pointer">
+      <input
+        type="checkbox"
+        class="personCheck mr-2"
+        value="Kiwi"
+        onchange="updateSelectedChips()"
+      />Kiwi
+    </label>
+    <hr class="my-2"/>
+    <label class="flex items-center p-2 hover:bg-gray-100 cursor-pointer">
+      <input
+        type="checkbox"
+        class="mr-2"
+        onclick="toggleAllCheckboxes(this)"
+      />Select All
+    </label>
+  </div>
+
+  <div id="selectedChips" class="mt-2 flex flex-wrap gap-2"></div>
+</div>
+
 
 
       <!-- Notes -->
