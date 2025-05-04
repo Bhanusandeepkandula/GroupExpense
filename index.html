@@ -179,29 +179,24 @@ function toggleAllCheckboxes(master) {
   updateSelectedChips();
 }
 
-    function updateEachPays(){
-  const amount = parseFloat(document.getElementById('amount').value);
-  const selected = Array.from(
-    document.getElementById('sharedWith').selectedOptions
-  ).map(opt => opt.value);
-  const disp = document.getElementById('eachPaysDisplay');
-  const info = document.getElementById('splitInfo');
+function updateEachPays(){
+       const amt = parseFloat(document.getElementById("amount").value) || 0;
+       const sel = document.querySelectorAll(".personCheck:checked");
+       const type = document.getElementById("type").value;
+-      let each = amt / sel.length;
++      let each = 0;
+       if(type === "Credit"){
+         each = amt;
+         document.getElementById("splitInfo").innerText = "Full amount to recorder";
+       } else if(sel.length){
+         each = amt / sel.length;
+         document.getElementById("splitInfo").innerText = `Split among ${sel.length} people`;
+       } else {
+         document.getElementById("splitInfo").innerText = "Select at least one person";
+       }
+       document.getElementById("eachPaysDisplay").innerText = each.toFixed(2);
+     }
 
-  if (isNaN(amount) || !selected.length) {
-    disp.textContent = "0.00";
-    info.textContent = selected.length ? "" : "Select at least one person";
-    return;
-  }
-
-  if (document.getElementById('type').value === 'Credit') {
-    disp.textContent = amount.toFixed(2);
-    info.textContent = "Full amount to recorder";
-  } else {
-    const each = amount / selected.length;
-    disp.textContent = each.toFixed(2);
-    info.textContent = `Split among ${selected.length} ${selected.length === 1 ? 'person' : 'people'}`;
-  }
-}
     function loadExpenses(){
       database.ref('expenses').orderByChild('timestamp').on('value',snap=>{
         const d=snap.val();
@@ -819,16 +814,29 @@ function toggleAllCheckboxes(master) {
       </div>
 
       <!-- Actions -->
-      <div class="flex flex-col sm:flex-row gap-3 pt-2">
-        <button id="submitBtn" type="submit"
-                class="btn-primary text-white py-2.5 px-5 rounded-lg flex-1 flex items-center justify-center">
-          <i class="fas fa-plus mr-2"></i> Add Expense
-        </button>
-        <button type="button" onclick="resetForm()"
-                class="bg-gray-100 text-gray-700 py-2.5 px-5 rounded-lg border">
-          <i class="fas fa-times mr-2"></i> Clear Form
-        </button>
-      </div>
+      -    <!-- Actions -->
+-    <div class="flex flex-col sm:flex-row gap-3">
+-      <button type="submit" id="submitBtn"
+-              class="btn-primary text-white py-2.5 px-5 rounded-lg flex-1 flex items-center justify-center">
+-        <i class="fas fa-plus mr-2"></i>Add Expense
+-      </button>
+-      <button type="button" onclick="resetForm()"
+-              class="bg-gray-100 text-gray-700 py-2.5 px-5 rounded-lg border">
+-        <i class="fas fa-times mr-2"></i>Clear Form
+-      </button>
+-    </div>
++    <!-- Actions -->
++    <div class="flex justify-end items-center gap-3">
++      <button type="submit" id="submitBtn"
++              class="btn-primary text-white py-2.5 px-6 rounded-lg inline-flex items-center">
++        <i class="fas fa-plus mr-2"></i>Add Expense
++      </button>
++      <button type="button" onclick="resetForm()"
++              class="bg-gray-100 text-gray-700 py-2.5 px-6 rounded-lg border inline-flex items-center">
++        <i class="fas fa-times mr-2"></i>Clear Form
++      </button>
++    </div>
+
     </form>
   </div>
 </section>
