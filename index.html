@@ -77,6 +77,24 @@
       overflow-y: auto;
       box-shadow: 0 10px 25px -5px rgba(0,0,0,0.1);
     }
+    #alertBox {
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      padding: 1rem 2rem;
+      border-radius: 8px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+      z-index: 100;
+      transition: all 0.3s ease;
+      display: flex;
+      align-items: center;
+      max-width: 90%;
+      text-align: center;
+    }
+    
+}
+
   </style>
   <script>
     // Firebase config & init
@@ -123,15 +141,18 @@
     function showAlert(msg, type='error'){
       const b = document.getElementById("alertBox");
       b.textContent = msg;
-      b.className = `fixed top-5 right-5 px-4 py-3 rounded-lg shadow transition-all duration-300 ${
+      b.className = `fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 px-8 py-4 rounded-lg shadow-lg transition-all duration-300 ${
         type==='error'?'bg-red-600':'bg-green-600'
       } text-white opacity-100 flex items-center`;
       
       const icon = document.createElement('i');
-      icon.className = type === 'error' ? 'fas fa-exclamation-circle mr-2' : 'fas fa-check-circle mr-2';
+      icon.className = type === 'error' ? 'fas fa-exclamation-circle mr-3' : 'fas fa-check-circle mr-3';
       b.prepend(icon);
       
-      setTimeout(()=>b.classList.add("opacity-0"),3000);
+      setTimeout(() => {
+        b.classList.add("opacity-0");
+        setTimeout(() => b.classList.add("hidden"), 300);
+      }, 3000);
     }
     function updateSessionByTime(){
       const h=new Date().getHours(), s=document.getElementById("session");
@@ -153,18 +174,26 @@
       updateSelectedChips();
     }
     function updateEachPays(){
-      const amt=parseFloat(document.getElementById('amount').value), 
-            sel=document.querySelectorAll('.personCheck:checked'), 
-            info=document.getElementById('splitInfo'), 
-            disp=document.getElementById('eachPaysDisplay');
-      if(isNaN(amt)||!sel.length){ 
+      const type = document.getElementById('type').value;
+      const amt = parseFloat(document.getElementById('amount').value), 
+            sel = document.querySelectorAll('.personCheck:checked'), 
+            info = document.getElementById('splitInfo'), 
+            disp = document.getElementById('eachPaysDisplay');
+      
+      if(isNaN(amt) || !sel.length){ 
         disp.textContent="0.00"; 
         info.textContent=sel.length?"":"Select at least one person"; 
         return; 
       }
-      const each=amt/sel.length;
-      disp.textContent=each.toFixed(2);
-      info.textContent=`Split among ${sel.length} ${sel.length===1?"person":"people"}`;
+      
+      if(type === 'Credit') {
+        disp.textContent = amt.toFixed(2);
+        info.textContent = "Full amount to recorder";
+      } else {
+        const each = amt/sel.length;
+        disp.textContent = each.toFixed(2);
+        info.textContent = `Split among ${sel.length} ${sel.length===1?"person":"people"}`;
+      }
     }
     function loadExpenses(){
       database.ref('expenses').orderByChild('timestamp').on('value',snap=>{
@@ -191,7 +220,13 @@
         return; 
       }
       
-      const eachPays=amount/people.length;
+      let eachPays;
+      if(type === 'Credit') {
+        eachPays = amount; // Full amount for credits
+      } else {
+        eachPays = amount/people.length; // Split for debits
+      }
+      
       const entry={
         date, session, type, amount, category, 
         notes, recordedBy, people, eachPays,
@@ -564,7 +599,7 @@
 
   <!-- Main App Content -->
   <div id="appContent" class="hidden px-4 max-w-7xl mx-auto pb-10">
-    <div id="alertBox" class="fixed top-5 right-5 px-4 py-3 rounded-lg shadow opacity-0 transition-all duration-300"></div>
+    <div id="alertBox" class="hidden"></div>
     
     <!-- Header -->
     <header class="py-8">
@@ -584,236 +619,188 @@
 
     <!-- Main Content -->
     <main class="max-w-6xl mx-auto">
-      <!-- Add Expense Section -->
-      <section class="mb-8">
-        <div class="card p-6">
-          <h2 class="text-xl font-semibold text-gray-800 mb-6 flex items-center">
-            <i class="fas fa-plus-circle mr-3 text-blue-500"></i>Add New Expense
-          </h2>
-          
-          <form class="space-y-5">
-            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-              <!-- Date Field -->
-              <div>
-                <label class="block text-sm font-medium text-gray-700 mb-1.5">Date</label>
-                <div class="relative">
-                  <input type="date" id="date" class="w-full form-input px-4 py-2.5" required />
-                  <div class="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
-                    <i class="fas fa-calendar text-gray-400"></i>
-                  </div>
-                </div>
-              </div>
-              
-              <!-- Session Field -->
-              <div>
-                <label class="block text-sm font-medium text-gray-700 mb-1.5">Time of Day</label>
-                <div class="relative">
-                  <select id="session" class="w-full form-input px-4 py-2.5">
-                    <option>Morning</option>
-                    <option>Afternoon</option>
-                    <option>Evening</option>
-                  </select>
-                  <div class="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
-                    <i class="fas fa-clock text-gray-400"></i>
-                  </div>
-                </div>
-              </div>
-              
-              <!-- Type Field -->
-              <div>
-                <label class="block text-sm font-medium text-gray-700 mb-1.5">Transaction Type</label>
-                <div class="relative">
-                  <select id="type" class="w-full form-input px-4 py-2.5">
-                    <option>Credit</option>
-                    <option>Debit</option>
-                  </select>
-                  <div class="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
-                    <i class="fas fa-exchange-alt text-gray-400"></i>
-                  </div>
-                </div>
-              </div>
-              
-              <!-- Amount Field -->
-              <div>
-                <label class="block text-sm font-medium text-gray-700 mb-1.5">Amount ($)</label>
-                <div class="relative">
-                  <input type="number" id="amount" placeholder="0.00" step="0.01" 
-                         class="w-full form-input px-4 py-2.5" required />
-                  <div class="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
-                    <i class="fas fa-dollar-sign text-gray-400"></i>
-                  </div>
-                </div>
-              </div>
-              
-              <!-- Category Field -->
-              <div>
-                <label class="block text-sm font-medium text-gray-700 mb-1.5">Category</label>
-                <div class="relative">
-                  <input type="text" id="category" placeholder="Select or enter category" 
-                         class="w-full form-input px-4 py-2.5" list="categories" />
-                  <div class="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
-                    <i class="fas fa-tag text-gray-400"></i>
-                  </div>
-                </div>
-                <datalist id="categories">
-                  <option>Food</option>
-                  <option>Rent</option>
-                  <option>Transport</option>
-                  <option>Shopping</option>
-                  <option>Entertainment</option>
-                  <option>Utilities</option>
-                  <option>Travel</option>
-                  <option>Health</option>
-                </datalist>
-              </div>
-              
-              <!-- Each Pays Field -->
-              <div>
-                <label class="block text-sm font-medium text-gray-700 mb-1.5">Split Amount</label>
-                <div class="w-full px-4 py-2.5 rounded-lg border border-gray-200 bg-gray-50 flex items-center">
-                  <i class="fas fa-user-friends mr-3 text-gray-500"></i>
-                  <div>
-                    <span class="font-medium">$<span id="eachPaysDisplay">0.00</span></span>
-                    <span id="splitInfo" class="text-xs text-gray-500 ml-2 block">Select at least one person</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-            
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
-              <!-- Recorded By Field -->
-              <div>
-                <label class="block text-sm font-medium text-gray-700 mb-1.5">Recorded By</label>
-                <div class="relative">
-                  <select id="recordedBy" class="w-full form-input px-4 py-2.5">
-                    <option>Babai</option>
-                    <option>Harsha</option>
-                    <option>Nihal</option>
-                    <option>Kiwi</option>
-                  </select>
-                  <div class="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
-                    <i class="fas fa-user-edit text-gray-400"></i>
-                  </div>
-                </div>
-              </div>
-              
-              <!-- Shared With Field -->
-              <div>
-                <label class="block text-sm font-medium text-gray-700 mb-1.5">Shared With</label>
-                <div class="relative">
-                  <button type="button" onclick="document.getElementById('peopleMenu').classList.toggle('hidden')"
-                          class="w-full px-4 py-2.5 rounded-lg border border-gray-200 bg-white text-left flex justify-between items-center hover:border-gray-300 transition-colors">
-                    <span class="text-gray-700">Select people</span>
-                    <i class="fas fa-chevron-down text-gray-500"></i>
-                  </button>
-                  <div id="peopleMenu" class="dropdown-menu absolute bg-white shadow-md rounded-lg p-2 mt-1 hidden z-10 w-full border border-gray-200">
-                    <label class="flex items-center p-2 hover:bg-gray-100 rounded-md cursor-pointer">
-                      <input type="checkbox" class="personCheck mr-3 h-4 w-4" value="Babai" onchange="updateSelectedChips()" />
-                      <i class="fas fa-user mr-2 text-gray-500"></i>Babai
-                    </label>
-                    <label class="flex items-center p-2 hover:bg-gray-100 rounded-md cursor-pointer">
-                      <input type="checkbox" class="personCheck mr-3 h-4 w-4" value="Harsha" onchange="updateSelectedChips()" />
-                      <i class="fas fa-user mr-2 text-gray-500"></i>Harsha
-                    </label>
-                    <label class="flex items-center p-2 hover:bg-gray-100 rounded-md cursor-pointer">
-                      <input type="checkbox" class="personCheck mr-3 h-4 w-4" value="Nihal" onchange="updateSelectedChips()" />
-                      <i class="fas fa-user mr-2 text-gray-500"></i>Nihal
-                    </label>
-                    <label class="flex items-center p-2 hover:bg-gray-100 rounded-md cursor-pointer">
-                      <input type="checkbox" class="personCheck mr-3 h-4 w-4" value="Kiwi" onchange="updateSelectedChips()" />
-                      <i class="fas fa-user mr-2 text-gray-500"></i>Kiwi
-                    </label>
-                    <hr class="my-2 border-gray-200" />
-                    <label class="flex items-center p-2 hover:bg-gray-100 rounded-md cursor-pointer">
-                      <input type="checkbox" class="mr-3 h-4 w-4" onchange="toggleAllCheckboxes(this)" />
-                      <i class="fas fa-users mr-2 text-gray-500"></i>Select All
-                    </label>
-                  </div>
-                  <div id="selectedChips" class="mt-2 flex flex-wrap gap-2"></div>
-                </div>
-              </div>
-            </div>
-            
-            <!-- Notes Field -->
-            <div>
-              <label class="block text-sm font-medium text-gray-700 mb-1.5">Notes</label>
-              <div class="relative">
-                <input type="text" id="notes" placeholder="Add any additional details" 
-                       class="w-full form-input px-4 py-2.5" />
-                <div class="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
-                  <i class="fas fa-sticky-note text-gray-400"></i>
-                </div>
-              </div>
-            </div>
-            
-            <!-- Form Actions -->
-            <div class="flex flex-col sm:flex-row gap-3 pt-2">
-              <button id="submitBtn" onclick="addEntry(event)" 
-                      class="btn-primary text-white py-2.5 px-5 rounded-lg hover:shadow-md transition-all flex-1 flex items-center justify-center">
-                <i class="fas fa-plus mr-2"></i> Add Expense
-              </button>
-              <button type="button" onclick="resetForm()" 
-                      class="bg-gray-100 text-gray-700 py-2.5 px-5 rounded-lg border border-gray-200 hover:bg-gray-200 transition-colors flex items-center justify-center">
-                <i class="fas fa-times mr-2"></i> Clear Form
-              </button>
-            </div>
-          </form>
-        </div>
-      </section>
+<section class="mb-8">
+  <div class="card p-6">
+    <h2 class="text-xl font-semibold text-gray-800 mb-6 flex items-center">
+      <i class="fas fa-plus-circle mr-3 text-blue-500"></i>Add New Expense
+    </h2>
 
-      <!-- Filters Section -->
-      <section class="mb-6">
-        <div class="card p-5">
-          <div class="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
-            <!-- View Tabs -->
-            <div class="flex border-b border-gray-200">
-              <button id="view-all" class="tab view-tab active px-4 py-2 flex items-center">
-                <i class="fas fa-list mr-2"></i>All
-              </button>
-              <button id="view-weekly" class="tab view-tab px-4 py-2 flex items-center">
-                <i class="fas fa-calendar-week mr-2"></i>Weekly
-              </button>
-              <button id="view-monthly" class="tab view-tab px-4 py-2 flex items-center">
-                <i class="fas fa-calendar-alt mr-2"></i>Monthly
-              </button>
-              <button id="view-user" class="tab view-tab px-4 py-2 flex items-center">
-                <i class="fas fa-user mr-2"></i>Mine
-              </button>
-            </div>
-            
-            <!-- Filter Controls -->
-            <div class="flex flex-col sm:flex-row items-start sm:items-center gap-3 w-full md:w-auto">
-              <!-- Date Range -->
-              <div class="flex items-center bg-gray-50 rounded-lg p-2 border border-gray-200">
-                <i class="fas fa-calendar-alt mr-2 text-gray-500"></i>
-                <input type="date" id="startDate" class="border rounded-md px-2 py-1 text-sm bg-white" onchange="renderExpenses()" />
-                <span class="mx-2 text-gray-400">to</span>
-                <input type="date" id="endDate" class="border rounded-md px-2 py-1 text-sm bg-white" onchange="renderExpenses()" />
-              </div>
-              
-              <!-- My Records Toggle -->
-              <label class="flex items-center bg-gray-50 rounded-lg p-2 border border-gray-200 cursor-pointer">
-                <input type="checkbox" id="myRecordsToggle" class="mr-2 h-4 w-4" onchange="toggleMyRecords()" />
-                <span class="text-sm text-gray-700 flex items-center">
-                  <i class="fas fa-filter mr-2 text-gray-500"></i>My Records
-                </span>
-              </label>
-              
-              <!-- Action Buttons -->
-              <div class="flex items-center gap-2">
-                <button onclick="showAnalytics()" 
-                        class="bg-white text-blue-600 px-4 py-2 rounded-lg border border-blue-200 hover:bg-blue-50 transition-colors flex items-center">
-                  <i class="fas fa-chart-pie mr-2"></i>Analytics
-                </button>
-                <button onclick="exportCSV()" 
-                        class="bg-white text-gray-700 px-4 py-2 rounded-lg border border-gray-200 hover:bg-gray-50 transition-colors flex items-center">
-                  <i class="fas fa-file-export mr-2"></i>Export
-                </button>
-              </div>
-            </div>
+    <form class="space-y-5" onsubmit="addEntry(event)">
+      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+
+        <!-- Date -->
+        <div class="form-field">
+          <label for="date" class="flex items-center text-gray-700 mb-1.5">
+            <i class="fas fa-calendar mr-2 text-gray-500"></i>Date
+          </label>
+          <input type="date" id="date" class="w-full form-input px-4 py-2.5" required />
+        </div>
+
+        <!-- Time of Day -->
+        <div class="form-field">
+          <label for="session" class="flex items-center text-gray-700 mb-1.5">
+            <i class="fas fa-clock mr-2 text-gray-500"></i>Time of Day
+          </label>
+          <select id="session" class="w-full form-input px-4 py-2.5">
+            <option>Morning</option>
+            <option>Afternoon</option>
+            <option>Evening</option>
+          </select>
+        </div>
+
+        <!-- Transaction Type -->
+        <div class="form-field">
+          <label for="type" class="flex items-center text-gray-700 mb-1.5">
+            <i class="fas fa-exchange-alt mr-2 text-gray-500"></i>Transaction Type
+          </label>
+          <select id="type" class="w-full form-input px-4 py-2.5">
+            <option>Credit</option>
+            <option>Debit</option>
+          </select>
+        </div>
+
+        <!-- Amount -->
+        <div class="form-field">
+          <label for="amount" class="flex items-center text-gray-700 mb-1.5">
+            <i class="fas fa-dollar-sign mr-2 text-gray-500"></i>Amount ($)
+          </label>
+          <input type="number" id="amount" placeholder="0.00" step="0.01"
+                 class="w-full form-input px-4 py-2.5" required />
+        </div>
+
+        <!-- Category -->
+        <div class="form-field">
+          <label for="category" class="flex items-center text-gray-700 mb-1.5">
+            <i class="fas fa-tag mr-2 text-gray-500"></i>Category
+          </label>
+          <input type="text" id="category" placeholder="Select or enter category"
+                 class="w-full form-input px-4 py-2.5" list="categories" />
+          <datalist id="categories">
+            <option>Food</option>
+            <option>Rent</option>
+            <option>Transport</option>
+            <option>Shopping</option>
+            <option>Entertainment</option>
+            <option>Utilities</option>
+            <option>Travel</option>
+            <option>Health</option>
+          </datalist>
+        </div>
+
+        <!-- Split Amount (display only) -->
+        <div class="form-field">
+          <label class="flex items-center text-gray-700 mb-1.5">
+            <i class="fas fa-user-friends mr-2 text-gray-500"></i>Split Amount
+          </label>
+          <div class="w-full form-input px-4 py-2.5 bg-gray-50 rounded-lg flex items-center">
+            <span class="font-medium">$<span id="eachPaysDisplay">0.00</span></span>
+            <span id="splitInfo" class="text-xs text-gray-500 ml-2 block">Select at least one person</span>
           </div>
         </div>
-      </section>
+      </div>
+
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-5 mt-4">
+
+        <!-- Recorded By -->
+        <div class="form-field">
+          <label for="recordedBy" class="flex items-center text-gray-700 mb-1.5">
+            <i class="fas fa-user-edit mr-2 text-gray-500"></i>Recorded By
+          </label>
+          <select id="recordedBy" class="w-full form-input px-4 py-2.5">
+            <option>Babai</option>
+            <option>Harsha</option>
+            <option>Nihal</option>
+            <option>Kiwi</option>
+          </select>
+        </div>
+
+        <!-- Shared With -->
+        <div class="form-field relative">
+          <label class="flex items-center text-gray-700 mb-1.5">
+            <i class="fas fa-users mr-2 text-gray-500"></i>Shared With
+          </label>
+          <button type="button" onclick="document.getElementById('peopleMenu').classList.toggle('hidden')"
+                  class="w-full form-input px-4 py-2.5 text-left flex justify-between items-center">
+            <span>Select people</span>
+            <i class="fas fa-chevron-down text-gray-500"></i>
+          </button>
+          <div id="peopleMenu" class="dropdown-menu absolute hidden mt-1 bg-white w-full border rounded-lg shadow p-2 z-10">
+            <!-- your personOption items here… -->
+          </div>
+          <div id="selectedChips" class="mt-2 flex flex-wrap gap-2"></div>
+        </div>
+      </div>
+
+      <!-- Notes -->
+      <div class="form-field mt-4">
+        <label for="notes" class="flex items-center text-gray-700 mb-1.5">
+          <i class="fas fa-sticky-note mr-2 text-gray-500"></i>Notes
+        </label>
+        <input type="text" id="notes" placeholder="Add any additional details"
+               class="w-full form-input px-4 py-2.5" />
+      </div>
+
+      <!-- Actions -->
+      <div class="flex flex-col sm:flex-row gap-3 pt-2">
+        <button id="submitBtn" type="submit"
+                class="btn-primary text-white py-2.5 px-5 rounded-lg flex-1 flex items-center justify-center">
+          <i class="fas fa-plus mr-2"></i> Add Expense
+        </button>
+        <button type="button" onclick="resetForm()"
+                class="bg-gray-100 text-gray-700 py-2.5 px-5 rounded-lg border">
+          <i class="fas fa-times mr-2"></i> Clear Form
+        </button>
+      </div>
+    </form>
+  </div>
+</section>
+
+
+      <!-- Filters Section -->
+     <section class="mb-6">
+  <div class="card p-5 flex flex-wrap items-center gap-4">
+    <!-- View Dropdown -->
+    <div class="w-full md:w-auto">
+      <label for="viewDropdown" class="sr-only">View</label>
+      <select id="viewDropdown" onchange="changeView(this.value)"
+              class="form-input px-4 py-2.5 rounded-lg border-gray-200 text-gray-700">
+        <option value="all">All</option>
+        <option value="weekly">Weekly</option>
+        <option value="monthly">Monthly</option>
+        <option value="user">Mine</option>
+      </select>
+    </div>
+
+    <!-- Date Range -->
+    <div class="flex items-center gap-2 w-full md:w-auto">
+      <i class="fas fa-calendar-alt text-gray-500"></i>
+      <input type="date" id="startDate" class="form-input text-sm p-1" onchange="renderExpenses()" />
+      <span class="text-gray-400">to</span>
+      <input type="date" id="endDate" class="form-input text-sm p-1" onchange="renderExpenses()" />
+    </div>
+
+    <!-- My Records Toggle -->
+    <label class="flex items-center gap-2 w-full md:w-auto">
+      <input type="checkbox" id="myRecordsToggle" class="h-4 w-4" onchange="toggleMyRecords()" />
+      <i class="fas fa-filter text-gray-500"></i>
+      <span class="text-gray-700 text-sm">My Records</span>
+    </label>
+
+    <!-- Push Actions to the right on desktop -->
+    <div class="flex items-center gap-2 w-full md:ml-auto md:w-auto">
+      <button onclick="showAnalytics()"
+              class="flex items-center text-sm text-blue-600 border border-blue-200 px-3 py-1 rounded-lg hover:bg-blue-50">
+        <i class="fas fa-chart-pie mr-1"></i>Analytics
+      </button>
+      <button onclick="exportCSV()"
+              class="flex items-center text-sm text-gray-700 border border-gray-200 px-3 py-1 rounded-lg hover:bg-gray-50">
+        <i class="fas fa-file-export mr-1"></i>Export
+      </button>
+    </div>
+  </div>
+</section>
+
+
 
       <!-- Summary Cards -->
       <section class="mb-6">
