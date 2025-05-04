@@ -174,27 +174,28 @@
       updateSelectedChips();
     }
     function updateEachPays(){
-      const type = document.getElementById('type').value;
-      const amt = parseFloat(document.getElementById('amount').value), 
-            sel = document.querySelectorAll('.personCheck:checked'), 
-            info = document.getElementById('splitInfo'), 
-            disp = document.getElementById('eachPaysDisplay');
-      
-      if(isNaN(amt) || !sel.length){ 
-        disp.textContent="0.00"; 
-        info.textContent=sel.length?"":"Select at least one person"; 
-        return; 
-      }
-      
-      if(type === 'Credit') {
-        disp.textContent = amt.toFixed(2);
-        info.textContent = "Full amount to recorder";
-      } else {
-        const each = amt/sel.length;
-        disp.textContent = each.toFixed(2);
-        info.textContent = `Split among ${sel.length} ${sel.length===1?"person":"people"}`;
-      }
-    }
+  const amount = parseFloat(document.getElementById('amount').value);
+  const selected = Array.from(
+    document.getElementById('sharedWith').selectedOptions
+  ).map(opt => opt.value);
+  const disp = document.getElementById('eachPaysDisplay');
+  const info = document.getElementById('splitInfo');
+
+  if (isNaN(amount) || !selected.length) {
+    disp.textContent = "0.00";
+    info.textContent = selected.length ? "" : "Select at least one person";
+    return;
+  }
+
+  if (document.getElementById('type').value === 'Credit') {
+    disp.textContent = amount.toFixed(2);
+    info.textContent = "Full amount to recorder";
+  } else {
+    const each = amount / selected.length;
+    disp.textContent = each.toFixed(2);
+    info.textContent = `Split among ${selected.length} ${selected.length === 1 ? 'person' : 'people'}`;
+  }
+}
     function loadExpenses(){
       database.ref('expenses').orderByChild('timestamp').on('value',snap=>{
         const d=snap.val();
@@ -203,52 +204,75 @@
         renderExpenses(); updateTotals(); updateUserBalances();
       });
     }
-    function addEntry(e){
-      e.preventDefault();
-      const date=document.getElementById('date').value, 
-            session=document.getElementById('session').value,
-            type=document.getElementById('type').value, 
-            amount=parseFloat(document.getElementById('amount').value),
-            category=document.getElementById('category').value, 
-            notes=document.getElementById('notes').value,
-            recordedBy=document.getElementById('recordedBy').value;
-      const people=[]; 
-      document.querySelectorAll('.personCheck:checked').forEach(cb=>people.push(cb.value));
-      
-      if(!date||isNaN(amount)||!people.length){ 
-        showAlert("Please complete all required fields", 'error'); 
-        return; 
-      }
-      
-      let eachPays;
-      if(type === 'Credit') {
-        eachPays = amount; // Full amount for credits
-      } else {
-        eachPays = amount/people.length; // Split for debits
-      }
-      
-      const entry={
-        date, session, type, amount, category, 
-        notes, recordedBy, people, eachPays,
-        timestamp: firebase.database.ServerValue.TIMESTAMP
-      };
-      
-      const ref=database.ref('expenses');
-      if(editIndex>=0){
-        const id=expenses[editIndex].id;
-        database.ref(`expenses/${id}`).update(entry).then(()=>{
-          editIndex=-1; 
-          document.getElementById('submitBtn').innerHTML='<i class="fas fa-plus mr-2"></i> Add Expense';
-          showAlert("Expense updated successfully", 'success'); 
-          resetForm();
-        }).catch(err=>showAlert("Update failed: " + err.message, 'error'));
-      } else {
-        ref.push(entry).then(()=>{ 
-          showAlert("Expense added successfully", 'success'); 
-          resetForm(); 
-        }).catch(err=>showAlert("Add failed: " + err.message, 'error'));
-      }
-    }
+    function addEntry(e) {
+  e.preventDefault();
+
+  // grab all the inputs
+  const date        = document.getElementById('date').value;
+  const session     = document.getElementById('session').value;
+  const type        = document.getElementById('type').value;
+  const amount      = parseFloat(document.getElementById('amount').value);
+  const category    = document.getElementById('category').value;
+  const notes       = document.getElementById('notes').value;
+  const recordedBy  = document.getElementById('recordedBy').value;
+
+  // read the multi‑select
+  const people = Array.from(
+    document.getElementById('sharedWith').selectedOptions
+  ).map(opt => opt.value);
+
+  // basic validation
+  if (!date || isNaN(amount) || people.length === 0) {
+    showAlert("Please complete all required fields", 'error');
+    return;
+  }
+
+  // compute per‑person split
+  let eachPays;
+  if (type === 'Credit') {
+    eachPays = amount;
+  } else {
+    eachPays = amount / people.length;
+  }
+
+  // build payload
+  const entry = {
+    date,
+    session,
+    type,
+    amount,
+    category,
+    notes,
+    recordedBy,
+    people,
+    eachPays,
+    timestamp: firebase.database.ServerValue.TIMESTAMP
+  };
+
+  const ref = database.ref('expenses');
+
+  if (editIndex >= 0) {
+    // updating existing
+    const id = expenses[editIndex].id;
+    database.ref(`expenses/${id}`).update(entry)
+      .then(() => {
+        showAlert("Expense updated successfully", 'success');
+        editIndex = -1;
+        document.getElementById('submitBtn').innerHTML = '<i class="fas fa-plus mr-2"></i> Add Expense';
+        resetForm();
+      })
+      .catch(err => showAlert("Update failed: " + err.message, 'error'));
+  } else {
+    // new push
+    ref.push(entry)
+      .then(() => {
+        showAlert("Expense added successfully", 'success');
+        resetForm();
+      })
+      .catch(err => showAlert("Add failed: " + err.message, 'error'));
+  }
+}
+
     function resetForm(){
       document.querySelector('form').reset();
       document.getElementById('selectedChips').innerHTML='';
@@ -715,21 +739,19 @@
         </div>
 
         <!-- Shared With -->
-        <div class="form-field relative">
-          <label class="flex items-center text-gray-700 mb-1.5">
-            <i class="fas fa-users mr-2 text-gray-500"></i>Shared With
-          </label>
-          <button type="button" onclick="document.getElementById('peopleMenu').classList.toggle('hidden')"
-                  class="w-full form-input px-4 py-2.5 text-left flex justify-between items-center">
-            <span>Select people</span>
-            <i class="fas fa-chevron-down text-gray-500"></i>
-          </button>
-          <div id="peopleMenu" class="dropdown-menu absolute hidden mt-1 bg-white w-full border rounded-lg shadow p-2 z-10">
-            <!-- your personOption items here… -->
-          </div>
-          <div id="selectedChips" class="mt-2 flex flex-wrap gap-2"></div>
-        </div>
-      </div>
+<div class="form-field">
+  <label for="sharedWith" class="flex items-center mb-1.5 text-gray-700">
+    <i class="fas fa-users mr-2 text-gray-500"></i>Shared With
+  </label>
+  <select id="sharedWith" multiple
+        class="w-full form-input px-4 py-2.5 h-28 overflow-auto"
+        onchange="updateEachPays()">
+  <option>Babai</option>
+  <option>Harsha</option>
+  <option>Nihal</option>
+  <option>Kiwi</option>
+</select>
+
 
       <!-- Notes -->
       <div class="form-field mt-4">
